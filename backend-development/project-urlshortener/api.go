@@ -28,18 +28,18 @@ func (h *apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodPost && url == "" {
 		if err := r.ParseForm(); err != nil {
-			writeErrorResp(w, err)
+			writeErrorResp(w, err, http.StatusBadRequest)
 			return
 		}
 		original := r.Form.Get("url")
 		if original == "" {
-			writeErrorResp(w, errors.New("empty url"))
+			writeErrorResp(w, errors.New("empty url"), http.StatusBadRequest)
 			return
 		}
 
 		short, err := shortByOriginalURL(original)
 		if err != nil {
-			writeErrorResp(w, err)
+			writeErrorResp(w, err, http.StatusOK)
 			return
 		}
 
@@ -51,7 +51,7 @@ func (h *apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		url = strings.TrimPrefix(url, "/")
 		originalURL, err := originalByShortURL(url)
 		if err != nil {
-			writeErrorResp(w, err)
+			writeErrorResp(w, err, http.StatusBadRequest)
 			return
 		}
 		http.Redirect(w, r, originalURL, http.StatusTemporaryRedirect)
@@ -99,9 +99,9 @@ func writeShorturlResp(w http.ResponseWriter, originalURL, shortURL string) {
 	}
 }
 
-func writeErrorResp(w http.ResponseWriter, err error) {
+func writeErrorResp(w http.ResponseWriter, err error, status int) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusBadRequest)
+	w.WriteHeader(status)
 	resp := errorResp{Error: err.Error()}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("Error encoding error json: %v\n", err)
