@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func main() {
@@ -20,8 +23,30 @@ func main() {
 		host = "localhost"
 	}
 
+	mongoURI := os.Getenv("MONGODB_URI")
+
+	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
+	clientOptions := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPIOptions)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mongoClient, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer func() {
+		dctx, dcancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer dcancel()
+
+		if err := mongoClient.Disconnect(dctx); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
 	e := echo.New()
-	h := newHandler(e)
+	h := newHandler(e, mongoClient)
 	serverAddr := host + ":" + port
 	s := http.Server{
 		Addr:         serverAddr,
