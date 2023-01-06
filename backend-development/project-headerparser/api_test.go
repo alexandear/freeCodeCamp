@@ -9,7 +9,8 @@ import (
 )
 
 func TestApiHandler_ServeHTTP(t *testing.T) {
-	api := &apiHandler{}
+	mux := http.NewServeMux()
+	api := newAPIHandler(mux)
 
 	s := httptest.NewServer(api)
 	defer s.Close()
@@ -27,12 +28,16 @@ func TestApiHandler_ServeHTTP(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	var resp respSuccess
+	var resp response
 	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
 		t.Fatal(err)
 	}
 
-	expected := respSuccess{
+	if "application/json" != res.Header.Get("Content-Type") {
+		t.Fatalf("must be json content type")
+	}
+
+	expected := response{
 		IPAddress: resp.IPAddress,
 		Language:  "en-US,en;q=0.5",
 		Software:  "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:50.0) Gecko/20100101 Firefox/50.0",

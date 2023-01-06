@@ -2,14 +2,20 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
+
+	"github.com/rs/cors"
 )
 
 type apiHandler struct {
 }
 
-type respSuccess struct {
+func newAPIHandler(mux *http.ServeMux) http.Handler {
+	mux.Handle("/api/whoami", &apiHandler{})
+	return cors.AllowAll().Handler(mux)
+}
+
+type response struct {
 	IPAddress string `json:"ipaddress"`
 	Language  string `json:"language"`
 	Software  string `json:"software"`
@@ -17,13 +23,9 @@ type respSuccess struct {
 
 func (h apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	resp := respSuccess{
+	_ = json.NewEncoder(w).Encode(response{
 		IPAddress: r.RemoteAddr,
 		Language:  r.Header.Get("Accept-Language"),
 		Software:  r.Header.Get("User-Agent"),
-	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Printf("Error encoding success json: %v\n", err)
-	}
+	})
 }
