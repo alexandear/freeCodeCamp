@@ -33,8 +33,11 @@ func main() {
 	staticFS := http.FS(staticFiles)
 	fs := rootPath(http.FileServer(staticFS))
 
+	api := &apiHandler{}
+
 	mux := http.NewServeMux()
 	mux.Handle("/", fs)
+	mux.Handle("/api/whoami", api)
 	handler := cors.AllowAll().Handler(mux)
 
 	log.Printf("Server is running on %s", serverAddr)
