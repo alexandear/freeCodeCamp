@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -29,6 +31,8 @@ func newHandler(e *echo.Echo, userServ *userService) http.Handler {
 	guser.POST("", h.CreateUser)
 	guser.GET("", h.Users)
 
+	guser.POST("/:id/exercises", h.CreateExercise)
+
 	return h
 }
 
@@ -54,4 +58,32 @@ func (h *handler) Users(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, users)
+}
+
+func (h *handler) CreateExercise(ctx echo.Context) error {
+	userID := ctx.Param("id")
+	description := ctx.FormValue("description")
+	duration, err := strconv.Atoi(ctx.FormValue("duration"))
+	if err != nil {
+		return fmt.Errorf("duration invalid: %w", err)
+	}
+	dateStr := ctx.FormValue("date")
+	var date time.Time
+	if dateStr != "" {
+		date = time.Now().UTC()
+		d, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return fmt.Errorf("date parse: %w", err)
+		}
+		date = d
+	} else {
+		date = time.Now().UTC()
+	}
+
+	ex, err := h.userServ.CreateExercise(ctx.Request().Context(), userID, description, duration, date)
+	if err != nil {
+		return fmt.Errorf("create exercise: %w", err)
+	}
+
+	return ctx.JSON(http.StatusOK, ex)
 }

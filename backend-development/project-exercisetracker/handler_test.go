@@ -121,6 +121,57 @@ func TestHandler_Users(t *testing.T) {
 	}
 }
 
+func TestHandler_CreateExercise(t *testing.T) {
+	db := newTestMongoDatabase(t)
+	us := newUserService(db)
+	h := newHandler(echo.New(), us)
+
+	s := httptest.NewServer(h)
+	defer s.Close()
+
+	resUser, err := client.PostForm(s.URL+"/api/users", url.Values{
+		"username": {"johndoe"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var u user
+	if err := json.NewDecoder(resUser.Body).Decode(&u); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := exercise{
+		Description: "test",
+		Duration:    60,
+		Date:        "Mon Jan 01 1990",
+		User: user{
+			ID:       u.ID,
+			Username: "johndoe",
+		},
+	}
+	res, err := client.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
+		"description": {"test"},
+		"duration":    {"60"},
+		"date":        {"1990-01-01"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if http.StatusOK != res.StatusCode {
+		t.Fatal("status must be OK")
+	}
+
+	var actual exercise
+	if err := json.NewDecoder(res.Body).Decode(&actual); err != nil {
+		t.Fatal(err)
+	}
+
+	if expected != actual {
+		t.Fatalf("expected %+v, got %+v", expected, actual)
+	}
+}
+
 func newTestMongoDatabase(t *testing.T) *mongo.Database {
 	t.Helper()
 
