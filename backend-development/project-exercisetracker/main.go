@@ -4,6 +4,7 @@ import (
 	"embed"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/rs/cors"
@@ -12,8 +13,6 @@ import (
 //go:embed views
 //go:embed public
 var staticFiles embed.FS
-
-const serverAddr = ":0"
 
 func rootPath(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -30,6 +29,16 @@ func rootPath(h http.Handler) http.Handler {
 }
 
 func main() {
+	port := "0"
+	if p := os.Getenv("PORT"); p != "" {
+		port = p
+	}
+
+	host := ""
+	if os.Getenv("ENVIRONMENT") == "local" {
+		host = "localhost"
+	}
+
 	staticFS := http.FS(staticFiles)
 	fs := rootPath(http.FileServer(staticFS))
 
@@ -37,6 +46,7 @@ func main() {
 	mux.Handle("/", fs)
 	handler := cors.AllowAll().Handler(mux)
 
-	log.Printf("Server is running on %s", serverAddr)
+	serverAddr := host + ":" + port
+	log.Printf("Server is running on http://%s", serverAddr)
 	log.Fatal(http.ListenAndServe(serverAddr, handler))
 }
