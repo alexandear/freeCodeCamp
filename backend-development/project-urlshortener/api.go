@@ -23,9 +23,9 @@ type errorResp struct {
 }
 
 func (h *apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	url := strings.TrimPrefix(r.URL.Path, "/api/")
+	url := strings.TrimPrefix(r.URL.Path, "/api/shorturl")
 
-	if r.Method == http.MethodPost && url == "shorturl" {
+	if r.Method == http.MethodPost && url == "" {
 		if err := r.ParseForm(); err != nil {
 			writeErrorResp(w, err)
 			return
@@ -47,6 +47,7 @@ func (h *apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodGet {
+		url = strings.TrimPrefix(url, "/")
 		originalURL, err := originalByShortURL(url)
 		if err != nil {
 			writeErrorResp(w, err)
