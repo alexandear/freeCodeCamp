@@ -41,7 +41,7 @@ func main() {
 	mux.Handle("/", fs)
 	mux.Handle("/api", api)
 	mux.Handle("/api/", api)
-	handler := cors.AllowAll().Handler(loggerMiddleware(mux))
+	handler := cors.AllowAll().Handler(mux)
 
 	log.Printf("Server is running on %s", serverAddr)
 	log.Fatal(http.ListenAndServe(serverAddr, handler))
