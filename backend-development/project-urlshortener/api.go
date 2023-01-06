@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var storedURLs []string
@@ -59,8 +60,9 @@ func (h *apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func shortByOriginalURL(originalURL string) (string, error) {
-	if _, err := http.Get(originalURL); err != nil {
-		return "", errors.New("url not exist")
+	client := &http.Client{Timeout: time.Second}
+	if _, err := client.Get(originalURL); err != nil {
+		return "", errors.New("invalid url")
 	}
 
 	for i, storedURL := range storedURLs {

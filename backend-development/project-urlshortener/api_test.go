@@ -33,6 +33,30 @@ func TestApiHandlerPost(t *testing.T) {
 	}
 }
 
+func TestApiHandlerPostError(t *testing.T) {
+	api := &apiHandler{}
+
+	s := httptest.NewServer(api)
+	defer s.Close()
+
+	res, err := http.PostForm(s.URL+"/api/shorturl", url.Values{"url": {"ftp:/john-doe.invalidTLD"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	var resp errorResp
+	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	expected := errorResp{
+		Error: "invalid url",
+	}
+	if expected != resp {
+		t.Fatalf("expected %+v, got %+v", expected, resp)
+	}
+}
+
 func TestApiHandlerGet(t *testing.T) {
 	api := &apiHandler{}
 
