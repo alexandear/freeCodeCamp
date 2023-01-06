@@ -63,18 +63,19 @@ func TestApiHandler_OK(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			req, err := http.Get(s.URL + tc.url)
+			res, err := http.Get(s.URL + tc.url)
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer res.Body.Close()
 
-			if req.StatusCode != http.StatusOK {
-				t.FailNow()
+			if http.StatusOK != res.StatusCode {
+				t.Fatal("response must be OK")
 			}
 
 			var resp respSuccess
-			if err := json.NewDecoder(req.Body).Decode(&resp); err != nil {
-				t.FailNow()
+			if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+				t.Fatal(err)
 			}
 			if tc.resp != resp {
 				t.Fatalf("expected %+v, got %+v", tc.resp, resp)
@@ -91,27 +92,19 @@ func TestApiHandler_Error(t *testing.T) {
 
 	req, err := http.Get(s.URL + "/api/this-is-not-a-date")
 	if err != nil {
-		t.FailNow()
+		t.Fatal(err)
 	}
 
 	if req.StatusCode != http.StatusBadRequest {
-		t.FailNow()
+		t.Fatal("response must be Bad request")
 	}
 
-	resp := &respError{}
-	if err := json.NewDecoder(req.Body).Decode(resp); err != nil {
-		t.FailNow()
+	var resp respError
+	if err := json.NewDecoder(req.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
 	}
-	if "Invalid Date" != resp.Error {
-		t.FailNow()
+	expected := respError{Error: "Invalid Date"}
+	if expected != resp {
+		t.Fatalf("expected %+v, got %+v", expected, resp)
 	}
-
-}
-
-func int64Ptr(val int64) *int64 {
-	return &val
-}
-
-func stringPtr(val string) *string {
-	return &val
 }

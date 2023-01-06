@@ -20,6 +20,10 @@ func TestApiHandlerPost(t *testing.T) {
 	}
 	defer res.Body.Close()
 
+	if http.StatusOK != res.StatusCode {
+		t.Fatal("status must be OK")
+	}
+
 	var resp shorturlResp
 	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
 		t.Fatal(err)

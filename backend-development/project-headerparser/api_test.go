@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestApiHandler_ServeHTTP(t *testing.T) {
@@ -19,7 +20,7 @@ func TestApiHandler_ServeHTTP(t *testing.T) {
 	}
 	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:50.0) Gecko/20100101 Firefox/50.0")
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second}
 	res, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -28,7 +29,7 @@ func TestApiHandler_ServeHTTP(t *testing.T) {
 
 	var resp respSuccess
 	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-		t.FailNow()
+		t.Fatal(err)
 	}
 
 	expected := respSuccess{
