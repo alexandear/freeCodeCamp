@@ -1,32 +1,13 @@
 package main
 
 import (
-	"embed"
 	"log"
 	"net/http"
 	"os"
-	"strings"
+	"time"
 
-	"github.com/rs/cors"
+	"github.com/labstack/echo/v4"
 )
-
-//go:embed views
-//go:embed public
-var staticFiles embed.FS
-
-func rootPath(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			r.URL.Path = "/views/"
-		} else {
-			b := strings.Split(r.URL.Path, "/")[0]
-			if b != "public" {
-				r.URL.Path = "/public" + r.URL.Path
-			}
-		}
-		h.ServeHTTP(w, r)
-	})
-}
 
 func main() {
 	port := "0"
@@ -39,14 +20,17 @@ func main() {
 		host = "localhost"
 	}
 
-	staticFS := http.FS(staticFiles)
-	fs := rootPath(http.FileServer(staticFS))
-
-	mux := http.NewServeMux()
-	mux.Handle("/", fs)
-	handler := cors.AllowAll().Handler(mux)
-
+	e := echo.New()
+	h := newHandler(e)
 	serverAddr := host + ":" + port
+	s := http.Server{
+		Addr:         serverAddr,
+		Handler:      h,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
 	log.Printf("Server is running on http://%s", serverAddr)
-	log.Fatal(http.ListenAndServe(serverAddr, handler))
+	if err := s.ListenAndServe(); err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
 }
