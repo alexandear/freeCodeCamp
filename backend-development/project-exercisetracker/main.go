@@ -12,6 +12,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	mongodbName = "exercise_tracker"
+)
+
 func main() {
 	port := "0"
 	if p := os.Getenv("PORT"); p != "" {
@@ -46,7 +50,9 @@ func main() {
 	}()
 
 	e := echo.New()
-	h := newHandler(e, mongoClient)
+	mongoDB := mongoClient.Database(mongodbName)
+	userServ := newUserService(mongoDB)
+	h := newHandler(e, userServ)
 	serverAddr := host + ":" + port
 	s := http.Server{
 		Addr:         serverAddr,

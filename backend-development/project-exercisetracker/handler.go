@@ -6,34 +6,28 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type handler struct {
-	e  *echo.Echo
-	mg *mongo.Client
-
-	db *mongo.Database
+	e        *echo.Echo
+	userServ *userService
 }
 
-func newHandler(e *echo.Echo, mongoClient *mongo.Client) http.Handler {
+func newHandler(e *echo.Echo, userServ *userService) http.Handler {
 	e.Use(middleware.CORS())
 	e.File("/", "views/index.html")
 	e.File("/style.css", "public/style.css")
 
 	h := &handler{
-		e:  e,
-		mg: mongoClient,
-
-		db: mongoClient.Database("exercise_tracker"),
+		e:        e,
+		userServ: userServ,
 	}
 
 	gapi := e.Group("/api")
 
 	guser := gapi.Group("/users")
 	guser.POST("", h.CreateUser)
+	guser.GET("", h.Users)
 
 	return h
 }
@@ -45,14 +39,19 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (h *handler) CreateUser(ctx echo.Context) error {
 	username := ctx.FormValue("username")
 
-	users := h.db.Collection("users")
-	res, err := users.InsertOne(ctx.Request().Context(), bson.D{{"username", username}})
+	u, err := h.userServ.CreateUser(ctx.Request().Context(), username)
 	if err != nil {
-		return fmt.Errorf("insert one: %w", err)
+		return fmt.Errorf("create user: %w", err)
 	}
 
-	return ctx.JSON(http.StatusOK, &user{
-		ID:       res.InsertedID.(primitive.ObjectID).Hex(),
-		Username: username,
-	})
+	return ctx.JSON(http.StatusOK, u)
+}
+
+func (h *handler) Users(ctx echo.Context) error {
+	users, err := h.userServ.AllUsers(ctx.Request().Context())
+	if err != nil {
+		return fmt.Errorf("all users: %w", err)
+	}
+
+	return ctx.JSON(http.StatusOK, users)
 }

@@ -50,8 +50,9 @@ func TestHandlerServeStaticContent(t *testing.T) {
 }
 
 func TestHandler_CreateUser(t *testing.T) {
-	mg := newTestMongoClient(t)
-	h := newHandler(echo.New(), mg)
+	db := newTestMongoDatabase(t)
+	us := newUserService(db)
+	h := newHandler(echo.New(), us)
 
 	s := httptest.NewServer(h)
 	defer s.Close()
@@ -82,7 +83,45 @@ func TestHandler_CreateUser(t *testing.T) {
 	}
 }
 
-func newTestMongoClient(t *testing.T) *mongo.Client {
+func TestHandler_Users(t *testing.T) {
+	db := newTestMongoDatabase(t)
+	us := newUserService(db)
+	h := newHandler(echo.New(), us)
+
+	s := httptest.NewServer(h)
+	defer s.Close()
+
+	for _, username := range []string{"cat", "wolf"} {
+		if _, err := client.PostForm(s.URL+"/api/users", url.Values{
+			"username": {username},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	res, err := client.Get(s.URL + "/api/users")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	var actual []user
+	if err := json.NewDecoder(res.Body).Decode(&actual); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(actual) == 0 {
+		t.Fatal("users must be returned")
+	}
+
+	for _, u := range actual {
+		if u.ID == "" || u.Username == "" {
+			t.Fatalf("id and username must not be empty, got: %+v", u)
+		}
+	}
+}
+
+func newTestMongoDatabase(t *testing.T) *mongo.Database {
 	t.Helper()
 
 	mongoURI := os.Getenv("MONGODB_URI")
@@ -98,5 +137,5 @@ func newTestMongoClient(t *testing.T) *mongo.Client {
 		t.Fatal(err)
 	}
 
-	return mongoClient
+	return mongoClient.Database("test_exercise_tracker")
 }
