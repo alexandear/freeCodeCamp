@@ -22,52 +22,62 @@ func TestApiHandler_OK(t *testing.T) {
 	s := httptest.NewServer(api)
 	defer s.Close()
 
-	for _, tc := range []struct {
-		url       string
-		expUnixMs *int64
-		expUTC    *string
+	for name, tc := range map[string]struct {
+		url  string
+		resp respSuccess
 	}{
-		{
-			url:       "/api",
-			expUnixMs: int64Ptr(1673391602000),
-			expUTC:    stringPtr("Fri, 10 Jan 2023 23:00:02 GMT"),
+		"valid date": {
+			url: "/api/2016-12-25",
+			resp: respSuccess{
+				UnixMs: 1482624000000,
+				UTC:    "Sun, 25 Dec 2016 00:00:00 GMT",
+			},
 		},
-		{
-			url:       "/api/",
-			expUnixMs: int64Ptr(1673391602000),
-			expUTC:    stringPtr("Fri, 10 Jan 2023 23:00:02 GMT"),
+		"valid unix ms": {
+			url: "/api/1451001600000",
+			resp: respSuccess{
+				UnixMs: 1451001600000,
+				UTC:    "Fri, 25 Dec 2015 02:00:00 GMT",
+			},
 		},
-		// {
-		// 	url:       "/api/2016-12-25",
-		// 	expUnixMs: int64Ptr(1673391602000),
-		// 	expUTC:    stringPtr("Fri, 10 Jan 2023 23:00:02 GMT"),
-		// },
-		// {
-		// 	url:       "/api/1451001600000",
-		// 	expUnixMs: int64Ptr(1673391602000),
-		// 	expUTC:    stringPtr("Fri, 10 Jan 2023 23:00:02 GMT"),
-		// },
-		// {
-		// 	url:       "/api/05 October 2011, GMT",
-		// 	expUnixMs: int64Ptr(1673391602000),
-		// 	expUTC:    stringPtr("Fri, 10 Jan 2023 23:00:02 GMT"),
-		// },
+		"custom date format": {
+			url: "/api/05 October 2011, GMT",
+			resp: respSuccess{
+				UnixMs: 1317772800000,
+				UTC:    "Wed, 05 Oct 2011 00:00:00 GMT",
+			},
+		},
+		"empty date parameter": {
+			url: "/api",
+			resp: respSuccess{
+				UnixMs: 1673391602000,
+				UTC:    "Tue, 10 Jan 2023 23:00:02 GMT",
+			},
+		},
+		"empty date parameter with slash": {
+			url: "/api/",
+			resp: respSuccess{
+				UnixMs: 1673391602000,
+				UTC:    "Tue, 10 Jan 2023 23:00:02 GMT",
+			},
+		},
 	} {
-		t.Run(tc.url, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			req, err := http.Get(s.URL + tc.url)
 			if err != nil {
+				t.Fatal(err)
+			}
+
+			if req.StatusCode != http.StatusOK {
 				t.FailNow()
 			}
 
-			resp := &respSuccess{}
-			if err := json.NewDecoder(req.Body).Decode(resp); err != nil {
+			var resp respSuccess
+			if err := json.NewDecoder(req.Body).Decode(&resp); err != nil {
 				t.FailNow()
 			}
-			if tc.expUnixMs != nil && *tc.expUnixMs != *resp.UnixMs {
-				t.Fatalf("expected %d, got %d", *tc.expUnixMs, *resp.UnixMs)
-			}
-      if tc.expUTC != nil && *tc.expUTC != resp.UTC {
-				t.Fatalf("expected %s, got %s", *tc.expUTC, resp.UTC)
+			if tc.resp != resp {
+				t.Fatalf("expected %+v, got %+v", tc.resp, resp)
 			}
 		})
 	}
@@ -79,18 +89,22 @@ func TestApiHandler_Error(t *testing.T) {
 	s := httptest.NewServer(api)
 	defer s.Close()
 
-  req, err := http.Get(s.URL + "/api/this-is-not-a-date")
-  if err != nil {
-    t.FailNow()
-  }
+	req, err := http.Get(s.URL + "/api/this-is-not-a-date")
+	if err != nil {
+		t.FailNow()
+	}
 
-  resp := &respError{}
-  if err := json.NewDecoder(req.Body).Decode(resp); err != nil {
-    t.FailNow()
-  }
-  if "Invalid Date" != resp.Error {
-    t.FailNow()
-  }
+	if req.StatusCode != http.StatusBadRequest {
+		t.FailNow()
+	}
+
+	resp := &respError{}
+	if err := json.NewDecoder(req.Body).Decode(resp); err != nil {
+		t.FailNow()
+	}
+	if "Invalid Date" != resp.Error {
+		t.FailNow()
+	}
 
 }
 

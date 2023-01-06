@@ -9,15 +9,18 @@ import (
 	"time"
 )
 
-const dateFormat = "2006-01-02"
+var allowedDateFormats = []string{
+	"2006-01-02",
+	"02 January 2006, GMT",
+}
 
 type apiHandler struct {
 	clock clock
 }
 
 type respSuccess struct {
-	UnixMs *int64 `json:"unix,omitempty"`
-	UTC    string `json:"utc,omitempty"`
+	UnixMs int64  `json:"unix"`
+	UTC    string `json:"utc"`
 }
 
 type respError struct {
@@ -25,34 +28,35 @@ type respError struct {
 }
 
 func (h apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	dateParam := strings.TrimPrefix(r.URL.Path, "/api")
-	if dateParam == "" || dateParam == "/" {
+	dateParam := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, "/api"), "/")
+	if dateParam == "" {
 		now := h.clock.Now()
-		ms := unixMs(now)
-		writeRespSuccess(w, &ms, now)
+		writeRespSuccess(w, now)
 		return
 	}
 
-	unixMs, err := strconv.ParseInt(dateParam, 10, 64)
+	unixMs, err := strconv.Atoi(dateParam)
 	if err == nil {
-		writeRespSuccess(w, &unixMs, time.UnixMilli(unixMs))
+		writeRespSuccess(w, time.UnixMilli(int64(unixMs)))
 		return
 	}
 
-	date, err := time.Parse(dateFormat, dateParam)
-	if err != nil {
-		writeRespError(w)
-		return
+	for _, df := range allowedDateFormats {
+		date, derr := time.Parse(df, dateParam)
+		if derr == nil {
+			writeRespSuccess(w, date)
+			return
+		}
 	}
 
-	writeRespSuccess(w, nil, date)
+	writeRespError(w)
 }
 
-func writeRespSuccess(w http.ResponseWriter, unixMs *int64, d time.Time) {
+func writeRespSuccess(w http.ResponseWriter, d time.Time) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	resp := respSuccess{
-		UnixMs: unixMs,
+		UnixMs: toUnixMs(d),
 		UTC:    d.Format(http.TimeFormat),
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -69,6 +73,6 @@ func writeRespError(w http.ResponseWriter) {
 	}
 }
 
-func unixMs(d time.Time) int64 {
+func toUnixMs(d time.Time) int64 {
 	return d.UnixNano() / int64(time.Millisecond)
 }
