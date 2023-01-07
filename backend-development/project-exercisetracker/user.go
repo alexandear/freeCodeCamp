@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type user struct {
@@ -82,8 +83,7 @@ func (s *userService) CreateExercise(ctx context.Context, userID, description, d
 
 	var date time.Time
 	if dateStr != "" {
-		date = time.Now().UTC()
-		d, err := time.Parse("2006-01-02", dateStr)
+		d, err := parseDate(dateStr)
 		if err != nil {
 			return user{}, exercise{}, fmt.Errorf("date parse: %w", err)
 		}
@@ -125,10 +125,26 @@ func (s *userService) findUserByID(ctx context.Context, objectID primitive.Objec
 	return user{ID: dbUser.ID, Username: dbUser.Username}, nil
 }
 
-func (s *userService) Logs(ctx context.Context, userID string) (user, []exercise, error) {
+func (s *userService) Logs(ctx context.Context, userID string, limit int, from, to string) (user, []exercise, error) {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return user{}, nil, fmt.Errorf("object id from hex: %w", err)
+	}
+	var fromDate time.Time
+	if from != "" {
+		d, err := parseDate(from)
+		if err != nil {
+			return user{}, nil, fmt.Errorf("from date parse: %w", err)
+		}
+		fromDate = d
+	}
+	var toDate time.Time
+	if to != "" {
+		d, err := parseDate(to)
+		if err != nil {
+			return user{}, nil, fmt.Errorf("to date parse: %w", err)
+		}
+		toDate = d
 	}
 
 	u, err := s.findUserByID(ctx, objectID)
@@ -136,7 +152,17 @@ func (s *userService) Logs(ctx context.Context, userID string) (user, []exercise
 		return user{}, nil, fmt.Errorf("find user by id: %w", err)
 	}
 
-	cursor, err := s.exerciseColl.Find(ctx, bson.D{{"user_id", userID}})
+	opts := options.Find()
+	opts.SetLimit(int64(limit))
+	filter := bson.D{{"user_id", userID}}
+	if !fromDate.IsZero() {
+		filter = append(filter, bson.E{"date", bson.D{{"$gte", fromDate}}})
+	}
+	if !toDate.IsZero() {
+		filter = append(filter, bson.E{"date", bson.D{{"$lte", toDate}}})
+	}
+
+	cursor, err := s.exerciseColl.Find(ctx, filter, opts)
 	if err != nil {
 		return user{}, nil, fmt.Errorf("find: %w", err)
 	}
@@ -161,4 +187,12 @@ func (s *userService) Logs(ctx context.Context, userID string) (user, []exercise
 	}
 
 	return u, exercises, nil
+}
+
+func parseDate(date string) (time.Time, error) {
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return d, nil
 }

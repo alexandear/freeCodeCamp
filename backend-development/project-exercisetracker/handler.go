@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -104,8 +105,11 @@ func (h *handler) CreateExercise(ctx echo.Context) error {
 
 func (h *handler) Logs(ctx echo.Context) error {
 	userID := ctx.Param("id")
+	limit, _ := strconv.Atoi(ctx.QueryParam("limit")) // 0 on error is acceptable
+	from := ctx.QueryParam("from")
+	to := ctx.QueryParam("to")
 
-	u, exercises, err := h.userServ.Logs(ctx.Request().Context(), userID)
+	u, exercises, err := h.userServ.Logs(ctx.Request().Context(), userID, limit, from, to)
 	if err != nil {
 		return fmt.Errorf("logs: %w", err)
 	}

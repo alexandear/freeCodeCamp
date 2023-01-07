@@ -208,12 +208,17 @@ func TestHandler_Logs(t *testing.T) {
 		{
 			Description: "ex 1",
 			Duration:    30,
-			Date:        "2023-02-22",
+			Date:        "2022-10-22",
 		},
 		{
 			Description: "ex 2",
 			Duration:    45,
-			Date:        "2023-02-25",
+			Date:        "2023-02-10",
+		},
+		{
+			Description: "ex 3",
+			Duration:    10,
+			Date:        "2023-10-25",
 		},
 	} {
 		if _, err := client.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
@@ -225,27 +230,101 @@ func TestHandler_Logs(t *testing.T) {
 		}
 	}
 
-	res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
+	t.Run("all", func(t *testing.T) {
+		res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
 
-	if http.StatusOK != res.StatusCode {
-		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
-	}
+		if http.StatusOK != res.StatusCode {
+			t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+		}
 
-	resBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	actual := string(resBytes)
+		resBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual := string(resBytes)
 
-	expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":2,"log":[{"date":"Wed Feb 02 2023","duration":30,"description":"ex 1"},{"date":"Sat Feb 02 2023","duration":45,"description":"ex 2"}]}
+		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":3,"log":[{"date":"Sat Oct 10 2022","duration":30,"description":"ex 1"},{"date":"Fri Feb 02 2023","duration":45,"description":"ex 2"},{"date":"Wed Oct 10 2023","duration":10,"description":"ex 3"}]}
 `, u.ID)
-	if expected != actual {
-		t.Fatalf("expected %+v, got %+v", expected, actual)
-	}
+		if expected != actual {
+			t.Fatalf("expected %+v, got %+v", expected, actual)
+		}
+	})
+
+	t.Run("limit", func(t *testing.T) {
+		res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs?limit=1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+
+		if http.StatusOK != res.StatusCode {
+			t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+		}
+
+		resBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual := string(resBytes)
+
+		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":1,"log":[{"date":"Sat Oct 10 2022","duration":30,"description":"ex 1"}]}
+`, u.ID)
+		if expected != actual {
+			t.Fatalf("expected %+v, got %+v", expected, actual)
+		}
+	})
+
+	t.Run("from", func(t *testing.T) {
+		res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs?from=2023-01-01")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+
+		if http.StatusOK != res.StatusCode {
+			t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+		}
+
+		resBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual := string(resBytes)
+
+		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":2,"log":[{"date":"Fri Feb 02 2023","duration":45,"description":"ex 2"},{"date":"Wed Oct 10 2023","duration":10,"description":"ex 3"}]}
+`, u.ID)
+		if expected != actual {
+			t.Fatalf("expected %+v, got %+v", expected, actual)
+		}
+	})
+
+	t.Run("to", func(t *testing.T) {
+		res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs?to=2023-04-01")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+
+		if http.StatusOK != res.StatusCode {
+			t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+		}
+
+		resBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual := string(resBytes)
+
+		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":2,"log":[{"date":"Sat Oct 10 2022","duration":30,"description":"ex 1"},{"date":"Fri Feb 02 2023","duration":45,"description":"ex 2"}]}
+`, u.ID)
+		if expected != actual {
+			t.Fatalf("expected %+v, got %+v", expected, actual)
+		}
+	})
 }
 
 func newTestMongoDatabase() *mongo.Database {
