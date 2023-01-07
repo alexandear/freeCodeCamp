@@ -19,11 +19,15 @@ type handlerUser struct {
 }
 
 type handlerExercise struct {
-	ID          string `json:"_id"`
-	Username    string `json:"username"`
 	Date        string `json:"date"`
 	Duration    int    `json:"duration"`
 	Description string `json:"description"`
+}
+
+type handlerLog struct {
+	handlerUser
+	Count int               `json:"count"`
+	Log   []handlerExercise `json:"log"`
 }
 
 func newHandler(e *echo.Echo, userServ *userService) http.Handler {
@@ -43,6 +47,8 @@ func newHandler(e *echo.Echo, userServ *userService) http.Handler {
 	guser.GET("", h.Users)
 
 	guser.POST("/:id/exercises", h.CreateExercise)
+
+	guser.GET("/:id/logs", h.Logs)
 
 	return h
 }
@@ -87,7 +93,24 @@ func (h *handler) CreateExercise(ctx echo.Context) error {
 		return fmt.Errorf("create exercise: %w", err)
 	}
 
-	return ctx.JSON(http.StatusOK, makeHandlerExercise(u, ex))
+	return ctx.JSON(http.StatusOK, struct {
+		handlerUser
+		handlerExercise
+	}{
+		handlerUser:     makeHandlerUser(u.ID, u.Username),
+		handlerExercise: makeHandlerExercise(ex),
+	})
+}
+
+func (h *handler) Logs(ctx echo.Context) error {
+	userID := ctx.Param("id")
+
+	u, exercises, err := h.userServ.Logs(ctx.Request().Context(), userID)
+	if err != nil {
+		return fmt.Errorf("logs: %w", err)
+	}
+
+	return ctx.JSON(http.StatusOK, makeHandlerLog(u, exercises))
 }
 
 func makeHandlerUser(id, username string) handlerUser {
@@ -97,12 +120,23 @@ func makeHandlerUser(id, username string) handlerUser {
 	}
 }
 
-func makeHandlerExercise(u user, ex exercise) handlerExercise {
+func makeHandlerExercise(ex exercise) handlerExercise {
 	return handlerExercise{
-		ID:          u.ID,
-		Username:    u.Username,
 		Date:        ex.Date.Format("Mon Jan 01 2006"),
 		Duration:    int(ex.Duration.Minutes()),
 		Description: ex.Description,
+	}
+}
+
+func makeHandlerLog(u user, exercises []exercise) handlerLog {
+	handlerExercises := make([]handlerExercise, 0, len(exercises))
+	for _, ex := range exercises {
+		handlerExercises = append(handlerExercises, makeHandlerExercise(ex))
+	}
+
+	return handlerLog{
+		handlerUser: makeHandlerUser(u.ID, u.Username),
+		Count:       len(exercises),
+		Log:         handlerExercises,
 	}
 }

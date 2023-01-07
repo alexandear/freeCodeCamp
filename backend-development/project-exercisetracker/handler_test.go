@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -86,6 +87,10 @@ func TestHandler_CreateUser(t *testing.T) {
 	var u handlerUser
 	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&u); err != nil {
 		t.Fatal(err)
+	}
+
+	if u.ID == "" {
+		t.Fatalf("_id must be non empty")
 	}
 
 	expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe"}
@@ -175,6 +180,68 @@ func TestHandler_CreateExercise(t *testing.T) {
 	actual := string(resBytes)
 
 	expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","date":"Mon Jan 01 1990","duration":60,"description":"test"}
+`, u.ID)
+	if expected != actual {
+		t.Fatalf("expected %+v, got %+v", expected, actual)
+	}
+}
+
+func TestHandler_Logs(t *testing.T) {
+	us := newUserService(db)
+	h := newHandler(echo.New(), us)
+
+	s := httptest.NewServer(h)
+	defer s.Close()
+
+	resUser, err := client.PostForm(s.URL+"/api/users", url.Values{
+		"username": {"johndoe"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var u handlerUser
+	if err := json.NewDecoder(resUser.Body).Decode(&u); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, ex := range []handlerExercise{
+		{
+			Description: "ex 1",
+			Duration:    30,
+			Date:        "2023-02-22",
+		},
+		{
+			Description: "ex 2",
+			Duration:    45,
+			Date:        "2023-02-25",
+		},
+	} {
+		if _, err := client.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
+			"description": {ex.Description},
+			"duration":    {strconv.Itoa(ex.Duration)},
+			"date":        {ex.Date},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	}
+
+	resBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual := string(resBytes)
+
+	expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":2,"log":[{"date":"Wed Feb 02 2023","duration":30,"description":"ex 1"},{"date":"Sat Feb 02 2023","duration":45,"description":"ex 2"}]}
 `, u.ID)
 	if expected != actual {
 		t.Fatalf("expected %+v, got %+v", expected, actual)

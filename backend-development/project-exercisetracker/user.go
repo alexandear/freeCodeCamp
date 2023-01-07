@@ -46,7 +46,7 @@ func (s *userService) CreateUser(ctx context.Context, username string) (string, 
 func (s *userService) AllUsers(ctx context.Context) ([]user, error) {
 	cursor, err := s.userColl.Find(ctx, bson.D{{}})
 	if err != nil {
-		return nil, fmt.Errorf("find one: %w", err)
+		return nil, fmt.Errorf("find: %w", err)
 	}
 
 	var dbUsers []struct {
@@ -92,15 +92,9 @@ func (s *userService) CreateExercise(ctx context.Context, userID, description, d
 		date = time.Now().UTC()
 	}
 
-	res := s.userColl.FindOne(ctx, bson.M{"_id": objectID})
-	if res.Err() != nil {
-		return user{}, exercise{}, fmt.Errorf("find one: %w", res.Err())
-	}
-	var dbUser struct {
-		Username string `bson:"username"`
-	}
-	if err := res.Decode(&dbUser); err != nil {
-		return user{}, exercise{}, fmt.Errorf("decode user: %w", err)
+	u, err := s.findUserByID(ctx, objectID)
+	if err != nil {
+		return user{}, exercise{}, fmt.Errorf("find user by id: %w", err)
 	}
 
 	if _, err := s.exerciseColl.InsertOne(ctx, bson.D{
@@ -112,13 +106,59 @@ func (s *userService) CreateExercise(ctx context.Context, userID, description, d
 		return user{}, exercise{}, fmt.Errorf("insert one: %w", err)
 	}
 
-	return user{
-			ID:       userID,
-			Username: dbUser.Username,
-		},
-		exercise{
-			Description: description,
-			Duration:    duration,
-			Date:        date,
-		}, nil
+	return u, exercise{Description: description, Duration: duration, Date: date}, nil
+}
+
+func (s *userService) findUserByID(ctx context.Context, objectID primitive.ObjectID) (user, error) {
+	res := s.userColl.FindOne(ctx, bson.M{"_id": objectID})
+	if res.Err() != nil {
+		return user{}, fmt.Errorf("find one: %w", res.Err())
+	}
+	var dbUser struct {
+		ID       string `bson:"_id"`
+		Username string `bson:"username"`
+	}
+	if err := res.Decode(&dbUser); err != nil {
+		return user{}, fmt.Errorf("decode user: %w", err)
+	}
+
+	return user{ID: dbUser.ID, Username: dbUser.Username}, nil
+}
+
+func (s *userService) Logs(ctx context.Context, userID string) (user, []exercise, error) {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return user{}, nil, fmt.Errorf("object id from hex: %w", err)
+	}
+
+	u, err := s.findUserByID(ctx, objectID)
+	if err != nil {
+		return user{}, nil, fmt.Errorf("find user by id: %w", err)
+	}
+
+	cursor, err := s.exerciseColl.Find(ctx, bson.D{{"user_id", userID}})
+	if err != nil {
+		return user{}, nil, fmt.Errorf("find: %w", err)
+	}
+
+	var dbExercises []struct {
+		UserID      string        `bson:"user_id"`
+		Description string        `bson:"description"`
+		Duration    time.Duration `bson:"duration"`
+		Date        time.Time     `bson:"date"`
+	}
+	if err := cursor.All(ctx, &dbExercises); err != nil {
+		return user{}, nil, fmt.Errorf("all: %w", err)
+	}
+
+	exercises := make([]exercise, 0, len(dbExercises))
+	for _, dbEx := range dbExercises {
+		exercises = append(exercises, exercise{
+			Description: dbEx.Description,
+			Duration:    dbEx.Duration,
+			Date:        dbEx.Date,
+		})
+	}
+
+	return u, exercises, nil
 }
