@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -11,13 +12,13 @@ import (
 )
 
 type user struct {
-	ID       string `bson:"_id" json:"_id"`
-	Username string `bson:"username" json:"username"`
+	ID       string
+	Username string
 }
 
 type exercise struct {
 	Description string
-	Duration    int
+	Duration    time.Duration
 	Date        time.Time
 }
 
@@ -33,16 +34,13 @@ func newUserService(db *mongo.Database) *userService {
 	}
 }
 
-func (s *userService) CreateUser(ctx context.Context, username string) (user, error) {
+func (s *userService) CreateUser(ctx context.Context, username string) (string, error) {
 	res, err := s.userColl.InsertOne(ctx, bson.D{{"username", username}})
 	if err != nil {
-		return user{}, fmt.Errorf("insert one: %w", err)
+		return "", fmt.Errorf("insert one: %w", err)
 	}
 
-	return user{
-		ID:       res.InsertedID.(primitive.ObjectID).Hex(),
-		Username: username,
-	}, nil
+	return res.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
 func (s *userService) AllUsers(ctx context.Context) ([]user, error) {
@@ -51,28 +49,57 @@ func (s *userService) AllUsers(ctx context.Context) ([]user, error) {
 		return nil, fmt.Errorf("find one: %w", err)
 	}
 
-	var users []user
-	if err := cursor.All(ctx, &users); err != nil {
+	var dbUsers []struct {
+		ID       string `bson:"_id"`
+		Username string `bson:"username"`
+	}
+	if err := cursor.All(ctx, &dbUsers); err != nil {
 		return nil, fmt.Errorf("all: %w", err)
 	}
 
+	users := make([]user, 0, len(dbUsers))
+	for _, dbUser := range dbUsers {
+		users = append(users, user{
+			ID:       dbUser.ID,
+			Username: dbUser.Username,
+		})
+	}
 	return users, nil
 }
 
-func (s *userService) CreateExercise(
-	ctx context.Context, userID, description string, duration int, date time.Time,
+func (s *userService) CreateExercise(ctx context.Context, userID, description, durationStr, dateStr string,
 ) (user, exercise, error) {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return user{}, exercise{}, fmt.Errorf("object id from hex: %w", err)
 	}
 
+	durationMin, err := strconv.Atoi(durationStr)
+	if err != nil {
+		return user{}, exercise{}, fmt.Errorf("duration invalid: %w", err)
+	}
+	duration := time.Duration(durationMin) * time.Minute
+
+	var date time.Time
+	if dateStr != "" {
+		date = time.Now().UTC()
+		d, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return user{}, exercise{}, fmt.Errorf("date parse: %w", err)
+		}
+		date = d
+	} else {
+		date = time.Now().UTC()
+	}
+
 	res := s.userColl.FindOne(ctx, bson.M{"_id": objectID})
 	if res.Err() != nil {
 		return user{}, exercise{}, fmt.Errorf("find one: %w", res.Err())
 	}
-	var u user
-	if err := res.Decode(&u); err != nil {
+	var dbUser struct {
+		Username string `bson:"username"`
+	}
+	if err := res.Decode(&dbUser); err != nil {
 		return user{}, exercise{}, fmt.Errorf("decode user: %w", err)
 	}
 
@@ -85,9 +112,13 @@ func (s *userService) CreateExercise(
 		return user{}, exercise{}, fmt.Errorf("insert one: %w", err)
 	}
 
-	return u, exercise{
-		Description: description,
-		Duration:    duration,
-		Date:        date,
-	}, nil
+	return user{
+			ID:       userID,
+			Username: dbUser.Username,
+		},
+		exercise{
+			Description: description,
+			Duration:    duration,
+			Date:        date,
+		}, nil
 }

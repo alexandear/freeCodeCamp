@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -65,27 +66,30 @@ func TestHandler_CreateUser(t *testing.T) {
 	s := httptest.NewServer(h)
 	defer s.Close()
 
-	expected := user{
-		Username: "johndoe",
-	}
 	res, err := client.PostForm(s.URL+"/api/users", url.Values{
-		"username": {expected.Username},
+		"username": {"johndoe"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
 
-	var actual user
-	if err := json.NewDecoder(res.Body).Decode(&actual); err != nil {
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	}
+
+	resBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual := string(resBytes)
+	var u handlerUser
+	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&u); err != nil {
 		t.Fatal(err)
 	}
 
-	if actual.ID == "" {
-		t.Fatalf("_id must be non-empty")
-	}
-	expected.ID = actual.ID
-
+	expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe"}
+`, u.ID)
 	if expected != actual {
 		t.Fatalf("expected %+v, got %+v", expected, actual)
 	}
@@ -112,7 +116,11 @@ func TestHandler_Users(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	var actual []user
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	}
+
+	var actual []handlerUser
 	if err := json.NewDecoder(res.Body).Decode(&actual); err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +149,7 @@ func TestHandler_CreateExercise(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var u user
+	var u handlerUser
 	if err := json.NewDecoder(resUser.Body).Decode(&u); err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +165,7 @@ func TestHandler_CreateExercise(t *testing.T) {
 	defer res.Body.Close()
 
 	if http.StatusOK != res.StatusCode {
-		t.Fatal("status must be OK")
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
 	}
 
 	resBytes, err := io.ReadAll(res.Body)

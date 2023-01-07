@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -13,6 +11,19 @@ import (
 type handler struct {
 	e        *echo.Echo
 	userServ *userService
+}
+
+type handlerUser struct {
+	ID       string `json:"_id"`
+	Username string `json:"username"`
+}
+
+type handlerExercise struct {
+	ID          string `json:"_id"`
+	Username    string `json:"username"`
+	Date        string `json:"date"`
+	Duration    int    `json:"duration"`
+	Description string `json:"description"`
 }
 
 func newHandler(e *echo.Echo, userServ *userService) http.Handler {
@@ -43,12 +54,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (h *handler) CreateUser(ctx echo.Context) error {
 	username := ctx.FormValue("username")
 
-	u, err := h.userServ.CreateUser(ctx.Request().Context(), username)
+	userID, err := h.userServ.CreateUser(ctx.Request().Context(), username)
 	if err != nil {
 		return fmt.Errorf("create user: %w", err)
 	}
 
-	return ctx.JSON(http.StatusOK, u)
+	return ctx.JSON(http.StatusOK, makeHandlerUser(userID, username))
 }
 
 func (h *handler) Users(ctx echo.Context) error {
@@ -57,45 +68,41 @@ func (h *handler) Users(ctx echo.Context) error {
 		return fmt.Errorf("all users: %w", err)
 	}
 
-	return ctx.JSON(http.StatusOK, users)
+	handlerUsers := make([]handlerUser, 0, len(users))
+	for _, u := range users {
+		handlerUsers = append(handlerUsers, makeHandlerUser(u.ID, u.Username))
+	}
+
+	return ctx.JSON(http.StatusOK, handlerUsers)
 }
 
 func (h *handler) CreateExercise(ctx echo.Context) error {
 	userID := ctx.Param("id")
 	description := ctx.FormValue("description")
-	duration, err := strconv.Atoi(ctx.FormValue("duration"))
-	if err != nil {
-		return fmt.Errorf("duration invalid: %w", err)
-	}
-	dateStr := ctx.FormValue("date")
-	var date time.Time
-	if dateStr != "" {
-		date = time.Now().UTC()
-		d, err := time.Parse("2006-01-02", dateStr)
-		if err != nil {
-			return fmt.Errorf("date parse: %w", err)
-		}
-		date = d
-	} else {
-		date = time.Now().UTC()
-	}
+	duration := ctx.FormValue("duration")
+	date := ctx.FormValue("date")
 
 	u, ex, err := h.userServ.CreateExercise(ctx.Request().Context(), userID, description, duration, date)
 	if err != nil {
 		return fmt.Errorf("create exercise: %w", err)
 	}
 
-	return ctx.JSON(http.StatusOK, struct {
-		ID          string `json:"_id"`
-		Username    string `json:"username"`
-		Date        string `json:"date"`
-		Duration    int    `json:"duration"`
-		Description string `json:"description"`
-	}{
+	return ctx.JSON(http.StatusOK, makeHandlerExercise(u, ex))
+}
+
+func makeHandlerUser(id, username string) handlerUser {
+	return handlerUser{
+		ID:       id,
+		Username: username,
+	}
+}
+
+func makeHandlerExercise(u user, ex exercise) handlerExercise {
+	return handlerExercise{
 		ID:          u.ID,
 		Username:    u.Username,
 		Date:        ex.Date.Format("Mon Jan 01 2006"),
-		Duration:    ex.Duration,
+		Duration:    int(ex.Duration.Minutes()),
 		Description: ex.Description,
-	})
+	}
 }
