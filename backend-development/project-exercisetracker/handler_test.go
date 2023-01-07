@@ -21,6 +21,14 @@ var client = &http.Client{
 	Timeout: time.Second,
 }
 
+var db *mongo.Database
+
+func TestMain(m *testing.M) {
+	db = newTestMongoDatabase()
+	exit := m.Run()
+	os.Exit(exit)
+}
+
 func TestHandlerServeStaticContent(t *testing.T) {
 	h := newHandler(echo.New(), nil)
 
@@ -50,7 +58,6 @@ func TestHandlerServeStaticContent(t *testing.T) {
 }
 
 func TestHandler_CreateUser(t *testing.T) {
-	db := newTestMongoDatabase(t)
 	us := newUserService(db)
 	h := newHandler(echo.New(), us)
 
@@ -84,7 +91,6 @@ func TestHandler_CreateUser(t *testing.T) {
 }
 
 func TestHandler_Users(t *testing.T) {
-	db := newTestMongoDatabase(t)
 	us := newUserService(db)
 	h := newHandler(echo.New(), us)
 
@@ -122,7 +128,6 @@ func TestHandler_Users(t *testing.T) {
 }
 
 func TestHandler_CreateExercise(t *testing.T) {
-	db := newTestMongoDatabase(t)
 	us := newUserService(db)
 	h := newHandler(echo.New(), us)
 
@@ -172,9 +177,7 @@ func TestHandler_CreateExercise(t *testing.T) {
 	}
 }
 
-func newTestMongoDatabase(t *testing.T) *mongo.Database {
-	t.Helper()
-
+func newTestMongoDatabase() *mongo.Database {
 	mongoURI := os.Getenv("MONGODB_URI")
 
 	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
@@ -185,7 +188,7 @@ func newTestMongoDatabase(t *testing.T) *mongo.Database {
 
 	mongoClient, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	return mongoClient.Database("test_exercise_tracker")
