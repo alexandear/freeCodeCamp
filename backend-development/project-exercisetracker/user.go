@@ -77,7 +77,7 @@ func (s *userService) CreateExercise(ctx context.Context, userID, description st
 	duration := time.Duration(durationMin) * time.Minute
 
 	if date.IsZero() {
-		date = time.Now().UTC()
+		date = time.Now()
 	}
 
 	u, err := s.findUserByID(ctx, objectID)
