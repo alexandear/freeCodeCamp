@@ -16,10 +16,9 @@ type user struct {
 }
 
 type exercise struct {
-	Description string `json:"description"`
-	Duration    int    `json:"duration"`
-	Date        string `json:"date"`
-	User        user
+	Description string
+	Duration    int
+	Date        time.Time
 }
 
 type userService struct {
@@ -62,19 +61,19 @@ func (s *userService) AllUsers(ctx context.Context) ([]user, error) {
 
 func (s *userService) CreateExercise(
 	ctx context.Context, userID, description string, duration int, date time.Time,
-) (exercise, error) {
+) (user, exercise, error) {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return exercise{}, fmt.Errorf("object id from hex: %w", err)
+		return user{}, exercise{}, fmt.Errorf("object id from hex: %w", err)
 	}
 
 	res := s.userColl.FindOne(ctx, bson.M{"_id": objectID})
 	if res.Err() != nil {
-		return exercise{}, fmt.Errorf("find one: %w", res.Err())
+		return user{}, exercise{}, fmt.Errorf("find one: %w", res.Err())
 	}
 	var u user
 	if err := res.Decode(&u); err != nil {
-		return exercise{}, fmt.Errorf("decode user: %w", err)
+		return user{}, exercise{}, fmt.Errorf("decode user: %w", err)
 	}
 
 	if _, err := s.exerciseColl.InsertOne(ctx, bson.D{
@@ -83,13 +82,12 @@ func (s *userService) CreateExercise(
 		{"duration", duration},
 		{"date", date},
 	}); err != nil {
-		return exercise{}, fmt.Errorf("insert one: %w", err)
+		return user{}, exercise{}, fmt.Errorf("insert one: %w", err)
 	}
 
-	return exercise{
+	return u, exercise{
 		Description: description,
 		Duration:    duration,
-		Date:        date.Format("Mon Jan 01 2006"),
-		User:        u,
+		Date:        date,
 	}, nil
 }

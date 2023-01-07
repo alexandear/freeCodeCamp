@@ -80,10 +80,22 @@ func (h *handler) CreateExercise(ctx echo.Context) error {
 		date = time.Now().UTC()
 	}
 
-	ex, err := h.userServ.CreateExercise(ctx.Request().Context(), userID, description, duration, date)
+	u, ex, err := h.userServ.CreateExercise(ctx.Request().Context(), userID, description, duration, date)
 	if err != nil {
 		return fmt.Errorf("create exercise: %w", err)
 	}
 
-	return ctx.JSON(http.StatusOK, ex)
+	return ctx.JSON(http.StatusOK, struct {
+		ID          string `json:"_id"`
+		Username    string `json:"username"`
+		Date        string `json:"date"`
+		Duration    int    `json:"duration"`
+		Description string `json:"description"`
+	}{
+		ID:          u.ID,
+		Username:    u.Username,
+		Date:        ex.Date.Format("Mon Jan 01 2006"),
+		Duration:    ex.Duration,
+		Description: ex.Description,
+	})
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -145,15 +146,6 @@ func TestHandler_CreateExercise(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := exercise{
-		Description: "test",
-		Duration:    60,
-		Date:        "Mon Jan 01 1990",
-		User: user{
-			ID:       u.ID,
-			Username: "johndoe",
-		},
-	}
 	res, err := client.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
 		"description": {"test"},
 		"duration":    {"60"},
@@ -162,16 +154,20 @@ func TestHandler_CreateExercise(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer res.Body.Close()
 
 	if http.StatusOK != res.StatusCode {
 		t.Fatal("status must be OK")
 	}
 
-	var actual exercise
-	if err := json.NewDecoder(res.Body).Decode(&actual); err != nil {
+	resBytes, err := io.ReadAll(res.Body)
+	if err != nil {
 		t.Fatal(err)
 	}
+	actual := string(resBytes)
 
+	expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","date":"Mon Jan 01 1990","duration":60,"description":"test"}
+`, u.ID)
 	if expected != actual {
 		t.Fatalf("expected %+v, got %+v", expected, actual)
 	}
