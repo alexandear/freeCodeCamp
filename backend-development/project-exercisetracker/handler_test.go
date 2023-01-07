@@ -162,7 +162,7 @@ func TestHandler_CreateExercise(t *testing.T) {
 	res, err := client.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
 		"description": {"test"},
 		"duration":    {"60"},
-		"date":        {"1990-01-01"},
+		"date":        {"1990-01-10"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +179,7 @@ func TestHandler_CreateExercise(t *testing.T) {
 	}
 	actual := string(resBytes)
 
-	expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","date":"Mon Jan 01 1990","duration":60,"description":"test"}
+	expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","date":"Wed Jan 10 1990","duration":60,"description":"test"}
 `, u.ID)
 	if expected != actual {
 		t.Fatalf("expected %+v, got %+v", expected, actual)
@@ -213,12 +213,12 @@ func TestHandler_Logs(t *testing.T) {
 		{
 			Description: "ex 2",
 			Duration:    45,
-			Date:        "2023-02-10",
+			Date:        "2023-02-09",
 		},
 		{
 			Description: "ex 3",
 			Duration:    10,
-			Date:        "2023-10-25",
+			Date:        "2023-11-25",
 		},
 	} {
 		if _, err := client.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
@@ -247,7 +247,7 @@ func TestHandler_Logs(t *testing.T) {
 		}
 		actual := string(resBytes)
 
-		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":3,"log":[{"date":"Sat Oct 10 2022","duration":30,"description":"ex 1"},{"date":"Fri Feb 02 2023","duration":45,"description":"ex 2"},{"date":"Wed Oct 10 2023","duration":10,"description":"ex 3"}]}
+		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":3,"log":[{"date":"Sat Oct 22 2022","duration":30,"description":"ex 1"},{"date":"Thu Feb 09 2023","duration":45,"description":"ex 2"},{"date":"Sat Nov 25 2023","duration":10,"description":"ex 3"}]}
 `, u.ID)
 		if expected != actual {
 			t.Fatalf("expected %+v, got %+v", expected, actual)
@@ -271,7 +271,7 @@ func TestHandler_Logs(t *testing.T) {
 		}
 		actual := string(resBytes)
 
-		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":1,"log":[{"date":"Sat Oct 10 2022","duration":30,"description":"ex 1"}]}
+		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":1,"log":[{"date":"Sat Oct 22 2022","duration":30,"description":"ex 1"}]}
 `, u.ID)
 		if expected != actual {
 			t.Fatalf("expected %+v, got %+v", expected, actual)
@@ -295,7 +295,7 @@ func TestHandler_Logs(t *testing.T) {
 		}
 		actual := string(resBytes)
 
-		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":2,"log":[{"date":"Fri Feb 02 2023","duration":45,"description":"ex 2"},{"date":"Wed Oct 10 2023","duration":10,"description":"ex 3"}]}
+		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":2,"log":[{"date":"Thu Feb 09 2023","duration":45,"description":"ex 2"},{"date":"Sat Nov 25 2023","duration":10,"description":"ex 3"}]}
 `, u.ID)
 		if expected != actual {
 			t.Fatalf("expected %+v, got %+v", expected, actual)
@@ -319,7 +319,7 @@ func TestHandler_Logs(t *testing.T) {
 		}
 		actual := string(resBytes)
 
-		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":2,"log":[{"date":"Sat Oct 10 2022","duration":30,"description":"ex 1"},{"date":"Fri Feb 02 2023","duration":45,"description":"ex 2"}]}
+		expected := fmt.Sprintf(`{"_id":"%s","username":"johndoe","count":2,"log":[{"date":"Sat Oct 22 2022","duration":30,"description":"ex 1"},{"date":"Thu Feb 09 2023","duration":45,"description":"ex 2"}]}
 `, u.ID)
 		if expected != actual {
 			t.Fatalf("expected %+v, got %+v", expected, actual)

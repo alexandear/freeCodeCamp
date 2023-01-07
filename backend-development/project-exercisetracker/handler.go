@@ -45,6 +45,7 @@ func newHandler(e *echo.Echo, userServ *userService) http.Handler {
 
 	guser := gapi.Group("/users")
 	guser.POST("", h.CreateUser)
+	guser.POST("/", h.CreateUser)
 	guser.GET("", h.Users)
 
 	guser.POST("/:id/exercises", h.CreateExercise)
@@ -126,7 +127,7 @@ func makeHandlerUser(id, username string) handlerUser {
 
 func makeHandlerExercise(ex exercise) handlerExercise {
 	return handlerExercise{
-		Date:        ex.Date.Format("Mon Jan 01 2006"),
+		Date:        ex.Date.Format("Mon Jan 02 2006"),
 		Duration:    int(ex.Duration.Minutes()),
 		Description: ex.Description,
 	}
