@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -68,27 +67,16 @@ func (s *userService) AllUsers(ctx context.Context) ([]user, error) {
 	return users, nil
 }
 
-func (s *userService) CreateExercise(ctx context.Context, userID, description, durationStr, dateStr string,
+func (s *userService) CreateExercise(ctx context.Context, userID, description string, durationMin int, date time.Time,
 ) (user, exercise, error) {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return user{}, exercise{}, fmt.Errorf("object id from hex: %w", err)
 	}
 
-	durationMin, err := strconv.Atoi(durationStr)
-	if err != nil {
-		return user{}, exercise{}, fmt.Errorf("duration invalid: %w", err)
-	}
 	duration := time.Duration(durationMin) * time.Minute
 
-	var date time.Time
-	if dateStr != "" {
-		d, err := parseDate(dateStr)
-		if err != nil {
-			return user{}, exercise{}, fmt.Errorf("date parse: %w", err)
-		}
-		date = d
-	} else {
+	if date.IsZero() {
 		date = time.Now().UTC()
 	}
 
@@ -125,26 +113,10 @@ func (s *userService) findUserByID(ctx context.Context, objectID primitive.Objec
 	return user{ID: dbUser.ID, Username: dbUser.Username}, nil
 }
 
-func (s *userService) Logs(ctx context.Context, userID string, limit int, from, to string) (user, []exercise, error) {
+func (s *userService) Logs(ctx context.Context, userID string, from, to time.Time, limit int) (user, []exercise, error) {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return user{}, nil, fmt.Errorf("object id from hex: %w", err)
-	}
-	var fromDate time.Time
-	if from != "" {
-		d, err := parseDate(from)
-		if err != nil {
-			return user{}, nil, fmt.Errorf("from date parse: %w", err)
-		}
-		fromDate = d
-	}
-	var toDate time.Time
-	if to != "" {
-		d, err := parseDate(to)
-		if err != nil {
-			return user{}, nil, fmt.Errorf("to date parse: %w", err)
-		}
-		toDate = d
 	}
 
 	u, err := s.findUserByID(ctx, objectID)
@@ -155,11 +127,11 @@ func (s *userService) Logs(ctx context.Context, userID string, limit int, from, 
 	opts := options.Find()
 	opts.SetLimit(int64(limit))
 	filter := bson.D{{"user_id", userID}}
-	if !fromDate.IsZero() {
-		filter = append(filter, bson.E{"date", bson.D{{"$gte", fromDate}}})
+	if !from.IsZero() {
+		filter = append(filter, bson.E{"date", bson.D{{"$gte", from}}})
 	}
-	if !toDate.IsZero() {
-		filter = append(filter, bson.E{"date", bson.D{{"$lte", toDate}}})
+	if !to.IsZero() {
+		filter = append(filter, bson.E{"date", bson.D{{"$lte", to}}})
 	}
 
 	cursor, err := s.exerciseColl.Find(ctx, filter, opts)
@@ -187,12 +159,4 @@ func (s *userService) Logs(ctx context.Context, userID string, limit int, from, 
 	}
 
 	return u, exercises, nil
-}
-
-func parseDate(date string) (time.Time, error) {
-	d, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return d, nil
 }

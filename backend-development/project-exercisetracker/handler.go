@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -87,10 +88,18 @@ func (h *handler) Users(ctx echo.Context) error {
 func (h *handler) CreateExercise(ctx echo.Context) error {
 	userID := ctx.Param("id")
 	description := ctx.FormValue("description")
-	duration := ctx.FormValue("duration")
-	date := ctx.FormValue("date")
+	durationMin, _ := strconv.Atoi(ctx.FormValue("duration"))
 
-	u, ex, err := h.userServ.CreateExercise(ctx.Request().Context(), userID, description, duration, date)
+	var date time.Time
+	if dateStr := ctx.FormValue("date"); dateStr != "" {
+		d, err := parseDate(dateStr)
+		if err != nil {
+			return fmt.Errorf("date parse: %w", err)
+		}
+		date = d
+	}
+
+	u, ex, err := h.userServ.CreateExercise(ctx.Request().Context(), userID, description, durationMin, date)
 	if err != nil {
 		return fmt.Errorf("create exercise: %w", err)
 	}
@@ -107,10 +116,25 @@ func (h *handler) CreateExercise(ctx echo.Context) error {
 func (h *handler) Logs(ctx echo.Context) error {
 	userID := ctx.Param("id")
 	limit, _ := strconv.Atoi(ctx.QueryParam("limit")) // 0 on error is acceptable
-	from := ctx.QueryParam("from")
-	to := ctx.QueryParam("to")
 
-	u, exercises, err := h.userServ.Logs(ctx.Request().Context(), userID, limit, from, to)
+	var from time.Time
+	if fromStr := ctx.QueryParam("from"); fromStr != "" {
+		d, err := parseDate(fromStr)
+		if err != nil {
+			return fmt.Errorf("parse from date: %w", err)
+		}
+		from = d
+	}
+	var to time.Time
+	if toStr := ctx.QueryParam("to"); toStr != "" {
+		d, err := parseDate(toStr)
+		if err != nil {
+			return fmt.Errorf("parse to date: %w", err)
+		}
+		to = d
+	}
+
+	u, exercises, err := h.userServ.Logs(ctx.Request().Context(), userID, from, to, limit)
 	if err != nil {
 		return fmt.Errorf("logs: %w", err)
 	}
@@ -144,4 +168,12 @@ func makeHandlerLog(u user, exercises []exercise) handlerLog {
 		Count:       len(exercises),
 		Log:         handlerExercises,
 	}
+}
+
+func parseDate(date string) (time.Time, error) {
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return d, nil
 }
