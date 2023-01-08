@@ -42,7 +42,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/", fs)
 
+	api := makeAPIHandler(mux)
+
 	serverAddr := host + ":" + port
-	log.Printf("Server is running on %s", serverAddr)
-	log.Fatal(http.ListenAndServe(serverAddr, mux))
+	log.Printf("Server is running on http://%s", serverAddr)
+	log.Fatal(http.ListenAndServe(serverAddr, api))
 }
