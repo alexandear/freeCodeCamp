@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"stockchecker/fcc"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -23,8 +25,12 @@ func main() {
 
 	e := echo.New()
 	e.Use(middleware.CORS()) // for testing purposes only
+	e.Use(fcc.FCC())
 	e.Static("/", "public")
 	e.File("/", "views/index.html")
+	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+		ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self'",
+	}))
 
 	serverAddr := host + ":" + port
 	s := http.Server{
