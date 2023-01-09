@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +11,12 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+const (
+	mongodbName = "stock_checker"
 )
 
 func main() {
@@ -23,7 +30,33 @@ func main() {
 		host = "localhost"
 	}
 
+	mongoURI := os.Getenv("MONGODB_URI")
+
+	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
+	clientOptions := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPIOptions)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mongoClient, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer func() {
+		dctx, dcancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer dcancel()
+
+		if err := mongoClient.Disconnect(dctx); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	mongoDB := mongoClient.Database(mongodbName)
+	stock := NewStockService(mongoDB)
 	e := echo.New()
+	h := NewHandler(e, stock)
+
 	e.Use(middleware.CORS()) // for testing purposes only
 	e.Use(fcc.FCC())
 	e.Static("/", "public")
@@ -35,7 +68,7 @@ func main() {
 	serverAddr := host + ":" + port
 	s := http.Server{
 		Addr:         serverAddr,
-		Handler:      e,
+		Handler:      h,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		IdleTimeout:  120 * time.Second,
