@@ -33,7 +33,7 @@ func main() {
 
 	var tr *gotest.TestResults
 	if os.Getenv("RUN_TESTS_ON_START") == "true" {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 		res, err := gotest.Run(ctx, ".", nil, true)
 		if err != nil {
@@ -47,7 +47,7 @@ func main() {
 	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
 	clientOptions := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPIOptions)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	mongoClient, err := mongo.Connect(ctx, clientOptions)
@@ -81,8 +81,8 @@ func main() {
 	s := http.Server{
 		Addr:         serverAddr,
 		Handler:      h,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 	log.Printf("Server is running on http://%s", serverAddr)

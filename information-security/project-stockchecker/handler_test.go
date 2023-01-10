@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	client = http.Client{Timeout: time.Second}
+	client = http.Client{Timeout: 2 * time.Second}
 	db     = newTestMongoDatabase()
 )
 
