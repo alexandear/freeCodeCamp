@@ -9,9 +9,25 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func FCC() echo.MiddlewareFunc {
+func FCC(tr *gotest.TestResults) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			if tr != nil && c.Request().Method == http.MethodGet && c.Request().URL.Path == "/_api/get-tests" {
+				type result struct {
+					Title string `json:"title"`
+					State string `json:"state"`
+				}
+
+				results := make([]result, 0, len(tr.TestResults))
+				for title, res := range tr.TestResults {
+					results = append(results, result{
+						Title: title,
+						State: string(res.Status),
+					})
+				}
+				return c.JSON(http.StatusOK, results)
+			}
+
 			defer func() {
 				if c.Request().Method == http.MethodGet && c.Request().URL.Path == "/_api/app-info" {
 					var header struct {
@@ -27,27 +43,6 @@ func FCC() echo.MiddlewareFunc {
 					return
 				}
 
-				if c.Request().Method == http.MethodGet && c.Request().URL.Path == "/_api/get-tests" {
-					type result struct {
-						Title string `json:"title"`
-						State string `json:"state"`
-					}
-					res, err := gotest.Run(c.Request().Context(), ".", nil, true)
-					if err != nil {
-						c.Error(err)
-						return
-					}
-
-					results := make([]result, 0, len(res.TestResults))
-					for title, res := range res.TestResults {
-						results = append(results, result{
-							Title: title,
-							State: string(res.Status),
-						})
-					}
-					c.JSON(http.StatusOK, results)
-					return
-				}
 			}()
 
 			return next(c)

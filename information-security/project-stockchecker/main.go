@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"stockchecker/fcc"
+	"stockchecker/gotest"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -28,6 +29,17 @@ func main() {
 	host := ""
 	if os.Getenv("ENVIRONMENT") == "local" {
 		host = "localhost"
+	}
+
+	var tr *gotest.TestResults
+	if os.Getenv("RUN_TESTS_ON_START") == "true" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		res, err := gotest.Run(ctx, ".", nil, true)
+		if err != nil {
+			log.Fatalf("Run failed")
+		}
+		tr = res
 	}
 
 	mongoURI := os.Getenv("MONGODB_URI")
@@ -58,7 +70,7 @@ func main() {
 	h := NewHandler(e, stock)
 
 	e.Use(middleware.CORS()) // for testing purposes only
-	e.Use(fcc.FCC())
+	e.Use(fcc.FCC(tr))
 	e.Static("/", "public")
 	e.File("/", "views/index.html")
 	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
