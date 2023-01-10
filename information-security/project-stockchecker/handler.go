@@ -61,7 +61,7 @@ func (h *Handler) StockPrice(ctx echo.Context) error {
 			IfLike:     ctx.QueryParam("like") == "true",
 			RemoteAddr: ctx.Request().RemoteAddr,
 		}
-		sd, err := h.stockServ.StockData(ctx.Request().Context(), param)
+		sd, err := h.stockServ.StockDataAndLike(ctx.Request().Context(), param)
 		if err != nil {
 			return fmt.Errorf("stock data: %w", err)
 		}

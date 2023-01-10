@@ -40,7 +40,7 @@ func NewStockService(db *mongo.Database) *StockService {
 	}
 }
 
-func (s *StockService) StockData(ctx context.Context, param StockDataParam) (StockData, error) {
+func (s *StockService) StockDataAndLike(ctx context.Context, param StockDataParam) (StockData, error) {
 	stock := param.Stock
 
 	ipHash, err := hashIP(param.RemoteAddr)
