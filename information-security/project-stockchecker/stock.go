@@ -105,7 +105,15 @@ func (s *StockService) StockDatas(ctx context.Context, stocks []string) ([]Stock
 
 	var dbStocks []storageStock
 	if err := cursor.All(ctx, &dbStocks); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cursor all: %w", err)
+	}
+
+	if len(dbStocks) != len(stocks) {
+		return nil, fmt.Errorf("len(dbStocks) must be equal len(stocks)")
+	}
+
+	for i, dbStock := range dbStocks {
+		stockDatas[i].LikesCount = dbStock.LikesCount
 	}
 
 	return stockDatas, nil
