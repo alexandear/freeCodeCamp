@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -25,9 +24,7 @@ type StockDataParam struct {
 }
 
 type storageStock struct {
-	Stock      string  `bson:"stock"`
-	Price      float64 `bson:"price"`
-	LikesCount int     `bson:"likes_count"`
+	LikesCount int `bson:"likes_count"`
 }
 
 type StockService struct {
@@ -44,59 +41,44 @@ func NewStockService(db *mongo.Database) *StockService {
 
 func (s *StockService) StockData(ctx context.Context, param StockDataParam) (StockData, error) {
 	stock := param.Stock
-	var incLike bool
 
 	ipHash, err := hashIP(param.RemoteAddr)
 	if err != nil {
 		return StockData{}, err
 	}
 
+	q, err := quote.Get(stock)
+	if err != nil {
+		return StockData{}, fmt.Errorf("quote get: %w", err)
+	}
+	price := q.Ask
+
+	var likesInc int
+	upsert := options.Update().SetUpsert(true)
 	if param.IfLike {
 		stockPerIP := param.Stock + "-" + ipHash
 		update := bson.D{{"$set", bson.D{{"_id", stockPerIP}}}}
-		res, err := s.stockPerIPs.UpdateByID(ctx, stockPerIP, update, options.Update().SetUpsert(true))
+		res, err := s.stockPerIPs.UpdateByID(ctx, stockPerIP, update, upsert)
 		if err != nil {
-			return StockData{}, fmt.Errorf("update by id: %w", err)
+			return StockData{}, fmt.Errorf("update stock per ips: %w", err)
 		}
 		if res.MatchedCount == 0 {
-			incLike = true
+			likesInc = 1
 		}
+	}
+
+	update := bson.D{{"$inc", bson.D{{"likes_count", likesInc}}}}
+	if _, err = s.stocks.UpdateByID(ctx, stock, update, upsert); err != nil {
+		return StockData{}, fmt.Errorf("update stock: %w", err)
 	}
 
 	var ss storageStock
-	ferr := s.stocks.FindOne(ctx, bson.M{"stock": stock}).Decode(&ss)
-	if errors.Is(ferr, mongo.ErrNoDocuments) {
-		q, err := quote.Get(stock)
-		if err != nil {
-			return StockData{}, fmt.Errorf("quote get: %w", err)
-		}
-
-		var likesCount int
-		if incLike {
-			likesCount = 1
-		}
-
-		ss := &storageStock{
-			Stock:      stock,
-			Price:      q.Ask,
-			LikesCount: likesCount,
-		}
-		_, insErr := s.stocks.InsertOne(ctx, ss)
-		if insErr != nil {
-			return StockData{}, fmt.Errorf("insert one: %w", err)
-		}
-
-		return StockData{
-			Price:      ss.Price,
-			LikesCount: ss.LikesCount,
-		}, nil
-	}
-	if ferr != nil {
-		return StockData{}, fmt.Errorf("find one: %w", ferr)
+	if err := s.stocks.FindOne(ctx, bson.M{"_id": stock}).Decode(&ss); err != nil {
+		return StockData{}, fmt.Errorf("find stock: %w", err)
 	}
 
 	return StockData{
-		Price:      ss.Price,
+		Price:      price,
 		LikesCount: ss.LikesCount,
 	}, nil
 }
