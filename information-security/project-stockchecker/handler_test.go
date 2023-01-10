@@ -138,7 +138,7 @@ func TestHandler_StockPrice_GetTwoStocks(t *testing.T) {
 	s := httptest.NewServer(h)
 	defer s.Close()
 
-	res, err := client.Get(s.URL + "/api/stock-prices?stock=GOOG&stock=MSFT")
+	res, err := client.Get(s.URL + "/api/stock-prices?stock=META&stock=INTC")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,51 @@ func TestHandler_StockPrice_GetTwoStocks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := fmt.Sprintf(`{"stockData":[{"stock":"GOOG","price":%g,"rel_likes":0},{"stock":"MSFT","price":%g,"rel_likes":0}]}
+	expected := fmt.Sprintf(`{"stockData":[{"stock":"META","price":%g,"rel_likes":0},{"stock":"INTC","price":%g,"rel_likes":0}]}
+`, stockPrices.StockData[0].Price, stockPrices.StockData[1].Price)
+	if expected != actual {
+		t.Fatalf("expected %+v, got %+v", expected, actual)
+	}
+}
+
+func TestHandler_StockPrice_TwoStocksWithLikes(t *testing.T) {
+	stockServ := NewStockService(db)
+	h := NewHandler(echo.New(), stockServ)
+
+	s := httptest.NewServer(h)
+	defer s.Close()
+
+	if _, err := client.Get(s.URL + "/api/stock-prices?stock=TSLA&like=true"); err != nil {
+		t.Fatal(err)
+	}
+	update := bson.D{{"$inc", bson.D{{"likes_count", 2}}}}
+	if _, err := stockServ.stocks.UpdateByID(context.Background(), "TSLA", update); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Get(s.URL + "/api/stock-prices?stock=KO&like=true"); err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.Get(s.URL + "/api/stock-prices?stock=TSLA&stock=KO")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	}
+
+	resBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual := string(resBytes)
+	var stockPrices StockPricesResp
+	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrices); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := fmt.Sprintf(`{"stockData":[{"stock":"TSLA","price":%g,"rel_likes":-2},{"stock":"KO","price":%g,"rel_likes":2}]}
 `, stockPrices.StockData[0].Price, stockPrices.StockData[1].Price)
 	if expected != actual {
 		t.Fatalf("expected %+v, got %+v", expected, actual)

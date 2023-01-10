@@ -25,7 +25,8 @@ type StockDataParam struct {
 }
 
 type storageStock struct {
-	LikesCount int `bson:"likes_count"`
+	Stock      string `bson:"_id"`
+	LikesCount int    `bson:"likes_count"`
 }
 
 type StockService struct {
@@ -84,20 +85,20 @@ func (s *StockService) StockDataAndLike(ctx context.Context, param StockDataPara
 	}, nil
 }
 
-func (s *StockService) StockDatas(ctx context.Context, stocks []string) ([]StockData, error) {
+func (s *StockService) StockDataMultiple(ctx context.Context, stocks []string) ([]StockData, error) {
 	stockDatas := make([]StockData, len(stocks))
 
-	find := make(bson.D, len(stocks))
+	var stocksA bson.A
 	for i, stock := range stocks {
 		q, err := quote.Get(stock)
 		if err != nil {
 			return nil, fmt.Errorf("quote for %s get: %w", stock, err)
 		}
 		stockDatas[i].Price = q.Ask
-
-		find = append(find, bson.E{"_id", stock})
+		stocksA = append(stocksA, stock)
 	}
 
+	find := bson.D{{"_id", bson.D{{"$in", stocksA}}}}
 	cursor, err := s.stocks.Find(ctx, find)
 	if err != nil {
 		return nil, fmt.Errorf("find stock: %w", err)
@@ -106,10 +107,6 @@ func (s *StockService) StockDatas(ctx context.Context, stocks []string) ([]Stock
 	var dbStocks []storageStock
 	if err := cursor.All(ctx, &dbStocks); err != nil {
 		return nil, fmt.Errorf("cursor all: %w", err)
-	}
-
-	if len(dbStocks) != len(stocks) {
-		return nil, fmt.Errorf("len(dbStocks) must be equal len(stocks)")
 	}
 
 	for i, dbStock := range dbStocks {

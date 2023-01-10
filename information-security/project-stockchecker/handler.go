@@ -75,7 +75,7 @@ func (h *Handler) StockPrice(ctx echo.Context) error {
 		})
 	}
 
-	sds, err := h.stockServ.StockDatas(ctx.Request().Context(), stocks)
+	sds, err := h.stockServ.StockDataMultiple(ctx.Request().Context(), stocks)
 	if err != nil {
 		return fmt.Errorf("stock datas: %w", err)
 	}
