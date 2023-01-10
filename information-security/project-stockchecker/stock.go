@@ -19,6 +19,7 @@ type StockData struct {
 
 type StockDataParam struct {
 	Stock      string
+	StockTwo   string
 	IfLike     bool
 	RemoteAddr string
 }
@@ -81,6 +82,33 @@ func (s *StockService) StockData(ctx context.Context, param StockDataParam) (Sto
 		Price:      price,
 		LikesCount: ss.LikesCount,
 	}, nil
+}
+
+func (s *StockService) StockDatas(ctx context.Context, stocks []string) ([]StockData, error) {
+	stockDatas := make([]StockData, len(stocks))
+
+	find := make(bson.D, len(stocks))
+	for i, stock := range stocks {
+		q, err := quote.Get(stock)
+		if err != nil {
+			return nil, fmt.Errorf("quote for %s get: %w", stock, err)
+		}
+		stockDatas[i].Price = q.Ask
+
+		find = append(find, bson.E{"_id", stock})
+	}
+
+	cursor, err := s.stocks.Find(ctx, find)
+	if err != nil {
+		return nil, fmt.Errorf("find stock: %w", err)
+	}
+
+	var dbStocks []storageStock
+	if err := cursor.All(ctx, &dbStocks); err != nil {
+		return nil, err
+	}
+
+	return stockDatas, nil
 }
 
 func hashIP(remoteAddr string) (string, error) {

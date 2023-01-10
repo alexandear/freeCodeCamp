@@ -132,6 +132,39 @@ func TestHandler_StockPrice_GetOneStockAndLikeFewTimes(t *testing.T) {
 	}
 }
 
+func TestHandler_StockPrice_GetTwoStocks(t *testing.T) {
+	h := NewHandler(echo.New(), NewStockService(db))
+
+	s := httptest.NewServer(h)
+	defer s.Close()
+
+	res, err := client.Get(s.URL + "/api/stock-prices?stock=GOOG&stock=MSFT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	}
+
+	resBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual := string(resBytes)
+	var stockPrices StockPricesResp
+	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrices); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := fmt.Sprintf(`{"stockData":[{"stock":"GOOG","price":%g,"rel_likes":0},{"stock":"MSFT","price":%g,"rel_likes":0}]}
+`, stockPrices.StockData[0].Price, stockPrices.StockData[1].Price)
+	if expected != actual {
+		t.Fatalf("expected %+v, got %+v", expected, actual)
+	}
+}
+
 func newTestMongoDatabase() *mongo.Database {
 	mongoURI := os.Getenv("MONGODB_URI")
 

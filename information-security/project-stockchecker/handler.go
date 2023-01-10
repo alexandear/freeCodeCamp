@@ -17,6 +17,16 @@ type StockDataResp struct {
 	Likes int     `json:"likes"`
 }
 
+type StockDatasResp struct {
+	Stock    string  `json:"stock"`
+	Price    float64 `json:"price"`
+	RelLikes int     `json:"rel_likes"`
+}
+
+type StockPricesResp struct {
+	StockData []StockDatasResp `json:"stockData"`
+}
+
 type Handler struct {
 	e         *echo.Echo
 	stockServ *StockService
@@ -39,21 +49,52 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Handler) StockPrice(ctx echo.Context) error {
-	param := StockDataParam{
-		Stock:      ctx.QueryParam("stock"),
-		IfLike:     ctx.QueryParam("like") == "true",
-		RemoteAddr: ctx.Request().RemoteAddr,
-	}
-	sd, err := h.stockServ.StockData(ctx.Request().Context(), param)
-	if err != nil {
-		return fmt.Errorf("stock data: %w", err)
+	qparams := ctx.QueryParams()
+	stocks, ok := qparams["stock"]
+	if !ok || len(stocks) < 1 {
+		return fmt.Errorf("stock is required")
 	}
 
-	return ctx.JSON(http.StatusOK, StockPriceResp{
-		StockData: StockDataResp{
-			Stock: param.Stock,
-			Price: sd.Price,
-			Likes: sd.LikesCount,
+	if len(stocks) == 1 {
+		param := StockDataParam{
+			Stock:      stocks[0],
+			IfLike:     ctx.QueryParam("like") == "true",
+			RemoteAddr: ctx.Request().RemoteAddr,
+		}
+		sd, err := h.stockServ.StockData(ctx.Request().Context(), param)
+		if err != nil {
+			return fmt.Errorf("stock data: %w", err)
+		}
+
+		return ctx.JSON(http.StatusOK, StockPriceResp{
+			StockData: StockDataResp{
+				Stock: param.Stock,
+				Price: sd.Price,
+				Likes: sd.LikesCount,
+			},
+		})
+	}
+
+	sds, err := h.stockServ.StockDatas(ctx.Request().Context(), stocks)
+	if err != nil {
+		return fmt.Errorf("stock datas: %w", err)
+	}
+
+	return ctx.JSON(
+		http.StatusOK,
+		StockPricesResp{
+			StockData: []StockDatasResp{
+				{
+					Stock:    stocks[0],
+					Price:    sds[0].Price,
+					RelLikes: sds[0].LikesCount - sds[1].LikesCount,
+				},
+				{
+					Stock:    stocks[1],
+					Price:    sds[1].Price,
+					RelLikes: sds[1].LikesCount - sds[0].LikesCount,
+				},
+			},
 		},
-	})
+	)
 }
