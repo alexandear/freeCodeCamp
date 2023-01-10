@@ -8,8 +8,11 @@ require (
 )
 
 require (
+	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/snappy v0.0.1 // indirect
+	github.com/hlts2/ip-hash v0.0.0-20190314042121-0e4d407f7fb9 // indirect
+	github.com/hlts2/round-robin v0.0.0-20190314040659-eb24115f39ce // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

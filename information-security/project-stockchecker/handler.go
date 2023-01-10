@@ -39,15 +39,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Handler) StockPrice(ctx echo.Context) error {
-	stock := ctx.QueryParam("stock")
-	sd, err := h.stockServ.StockData(ctx.Request().Context(), stock)
+	param := StockDataParam{
+		Stock:      ctx.QueryParam("stock"),
+		IfLike:     ctx.QueryParam("like") == "true",
+		RemoteAddr: ctx.Request().RemoteAddr,
+	}
+	sd, err := h.stockServ.StockData(ctx.Request().Context(), param)
 	if err != nil {
 		return fmt.Errorf("stock data: %w", err)
 	}
 
 	return ctx.JSON(http.StatusOK, StockPriceResp{
 		StockData: StockDataResp{
-			Stock: stock,
+			Stock: param.Stock,
 			Price: sd.Price,
 			Likes: sd.LikesCount,
 		},

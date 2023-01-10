@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +13,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -40,9 +44,89 @@ func TestHandler_StockPrice_GetOneStock(t *testing.T) {
 		t.Fatal(err)
 	}
 	actual := string(resBytes)
+	var stockPrice StockPriceResp
+	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrice); err != nil {
+		t.Fatal(err)
+	}
 
-	expected := `{"stockData":{"stock":"GRMN","price":98.33,"likes":0}}
-`
+	if stockPrice.StockData.Price == 0.0 {
+		t.Fatalf("price must be non-zero")
+	}
+
+	expected := fmt.Sprintf(`{"stockData":{"stock":"GRMN","price":%g,"likes":0}}
+`, stockPrice.StockData.Price)
+	if expected != actual {
+		t.Fatalf("expected %+v, got %+v", expected, actual)
+	}
+}
+
+func TestHandler_StockPrice_GetOneStockAndLike(t *testing.T) {
+	h := NewHandler(echo.New(), NewStockService(db))
+
+	s := httptest.NewServer(h)
+	defer s.Close()
+
+	res, err := client.Get(s.URL + "/api/stock-prices?stock=AAPL&like=true")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	}
+
+	resBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual := string(resBytes)
+	var stockPrice StockPriceResp
+	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrice); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := fmt.Sprintf(`{"stockData":{"stock":"AAPL","price":%g,"likes":1}}
+`, stockPrice.StockData.Price)
+	if expected != actual {
+		t.Fatalf("expected %+v, got %+v", expected, actual)
+	}
+}
+
+func TestHandler_StockPrice_GetOneStockAndLikeFewTimes(t *testing.T) {
+	h := NewHandler(echo.New(), NewStockService(db))
+
+	s := httptest.NewServer(h)
+	defer s.Close()
+
+	if _, err := client.Get(s.URL + "/api/stock-prices?stock=MSFT&like=true"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Get(s.URL + "/api/stock-prices?stock=MSFT&like=true"); err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.Get(s.URL + "/api/stock-prices?stock=MSFT&like=true")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	}
+
+	resBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual := string(resBytes)
+	var stockPrice StockPriceResp
+	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrice); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := fmt.Sprintf(`{"stockData":{"stock":"MSFT","price":%g,"likes":1}}
+`, stockPrice.StockData.Price)
 	if expected != actual {
 		t.Fatalf("expected %+v, got %+v", expected, actual)
 	}
@@ -62,5 +146,10 @@ func newTestMongoDatabase() *mongo.Database {
 		panic(err)
 	}
 
-	return mongoClient.Database("test_stock_checker")
+	res := mongoClient.Database("test_stock_checker")
+
+	_, _ = res.Collection("stocks").DeleteMany(context.Background(), bson.D{{}})
+	_, _ = res.Collection("stock_per_ips").DeleteMany(context.Background(), bson.D{{}})
+
+	return res
 }
