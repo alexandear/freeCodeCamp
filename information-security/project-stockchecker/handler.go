@@ -39,7 +39,7 @@ func NewHandler(e *echo.Echo, stockServ *StockService) *Handler {
 	}
 	api := e.Group("/api")
 
-	api.GET("/stock-prices", h.StockPrice)
+	api.GET("/stock-prices*", h.StockPrice)
 
 	return h
 }

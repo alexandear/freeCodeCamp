@@ -71,7 +71,7 @@ func main() {
 
 	e.Use(middleware.CORS()) // for testing purposes only
 	e.Use(fcc.FCC(tr))
-	e.Static("/", "public")
+	e.Static("/public", "public")
 	e.File("/", "views/index.html")
 	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
 		ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self'",
