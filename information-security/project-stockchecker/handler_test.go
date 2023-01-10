@@ -182,7 +182,7 @@ func TestHandler_StockPrice_TwoStocksWithLikes(t *testing.T) {
 	if _, err := client.Get(s.URL + "/api/stock-prices?stock=KO&like=true"); err != nil {
 		t.Fatal(err)
 	}
-	res, err := client.Get(s.URL + "/api/stock-prices?stock=TSLA&stock=KO")
+	res, err := client.Get(s.URL + "/api/stock-prices?stock=TSLA&stock=KO&like=true")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestHandler_StockPrice_TwoStocksWithLikes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := fmt.Sprintf(`{"stockData":[{"stock":"TSLA","price":%g,"rel_likes":-2},{"stock":"KO","price":%g,"rel_likes":2}]}
+	expected := fmt.Sprintf(`{"stockData":[{"stock":"TSLA","price":%g,"rel_likes":2},{"stock":"KO","price":%g,"rel_likes":-2}]}
 `, stockPrices.StockData[0].Price, stockPrices.StockData[1].Price)
 	if expected != actual {
 		t.Fatalf("expected %+v, got %+v", expected, actual)

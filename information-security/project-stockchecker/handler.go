@@ -54,12 +54,14 @@ func (h *Handler) StockPrice(ctx echo.Context) error {
 	if !ok || len(stocks) < 1 {
 		return fmt.Errorf("stock is required")
 	}
+	ifLike := ctx.QueryParam("like") == "true"
+	remoteAddr := ctx.Request().RemoteAddr
 
 	if len(stocks) == 1 {
 		param := StockDataParam{
 			Stock:      stocks[0],
-			IfLike:     ctx.QueryParam("like") == "true",
-			RemoteAddr: ctx.Request().RemoteAddr,
+			IfLike:     ifLike,
+			RemoteAddr: remoteAddr,
 		}
 		sd, err := h.stockServ.StockDataAndLike(ctx.Request().Context(), param)
 		if err != nil {
@@ -75,9 +77,15 @@ func (h *Handler) StockPrice(ctx echo.Context) error {
 		})
 	}
 
-	sds, err := h.stockServ.StockDataMultiple(ctx.Request().Context(), stocks)
+	param := StockDataParam2{
+		Stock1:     stocks[0],
+		Stock2:     stocks[1],
+		IfLike:     ifLike,
+		RemoteAddr: remoteAddr,
+	}
+	sds, err := h.stockServ.StockDataAndLike2(ctx.Request().Context(), param)
 	if err != nil {
-		return fmt.Errorf("stock datas: %w", err)
+		return fmt.Errorf("stock data 2: %w", err)
 	}
 
 	return ctx.JSON(

@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/sync/errgroup"
 )
 
 type StockData struct {
@@ -19,7 +20,13 @@ type StockData struct {
 
 type StockDataParam struct {
 	Stock      string
-	StockTwo   string
+	IfLike     bool
+	RemoteAddr string
+}
+
+type StockDataParam2 struct {
+	Stock1     string
+	Stock2     string
 	IfLike     bool
 	RemoteAddr string
 }
@@ -85,35 +92,59 @@ func (s *StockService) StockDataAndLike(ctx context.Context, param StockDataPara
 	}, nil
 }
 
-func (s *StockService) StockDataMultiple(ctx context.Context, stocks []string) ([]StockData, error) {
-	stockDatas := make([]StockData, len(stocks))
+func (s *StockService) StockDataAndLike2(ctx context.Context, param StockDataParam2) ([2]StockData, error) {
+	g, gctx := errgroup.WithContext(ctx)
 
-	var stocksA bson.A
-	for i, stock := range stocks {
-		q, err := quote.Get(stock)
-		if err != nil {
-			return nil, fmt.Errorf("quote for %s get: %w", stock, err)
+	var (
+		price1 float64
+		likes1 int
+	)
+	g.Go(func() error {
+		p := StockDataParam{
+			Stock:      param.Stock1,
+			IfLike:     param.IfLike,
+			RemoteAddr: param.RemoteAddr,
 		}
-		stockDatas[i].Price = q.Ask
-		stocksA = append(stocksA, stock)
+		sd, err := s.StockDataAndLike(gctx, p)
+		if err != nil {
+			return fmt.Errorf("stock data for %s: %w", param.Stock1, err)
+		}
+		price1 = sd.Price
+		likes1 = sd.LikesCount
+		return nil
+	})
+	var (
+		price2 float64
+		likes2 int
+	)
+	g.Go(func() error {
+		p := StockDataParam{
+			Stock:      param.Stock2,
+			IfLike:     param.IfLike,
+			RemoteAddr: param.RemoteAddr,
+		}
+		sd, err := s.StockDataAndLike(gctx, p)
+		if err != nil {
+			return fmt.Errorf("stock data for %s: %w", param.Stock2, err)
+		}
+		price2 = sd.Price
+		likes2 = sd.LikesCount
+		return nil
+	})
+	if err := g.Wait(); err != nil {
+		return [2]StockData{}, err
 	}
 
-	find := bson.D{{"_id", bson.D{{"$in", stocksA}}}}
-	cursor, err := s.stocks.Find(ctx, find)
-	if err != nil {
-		return nil, fmt.Errorf("find stock: %w", err)
-	}
-
-	var dbStocks []storageStock
-	if err := cursor.All(ctx, &dbStocks); err != nil {
-		return nil, fmt.Errorf("cursor all: %w", err)
-	}
-
-	for i, dbStock := range dbStocks {
-		stockDatas[i].LikesCount = dbStock.LikesCount
-	}
-
-	return stockDatas, nil
+	return [2]StockData{
+		{
+			Price:      price1,
+			LikesCount: likes1,
+		},
+		{
+			Price:      price2,
+			LikesCount: likes2,
+		},
+	}, nil
 }
 
 func hashIP(remoteAddr string) (string, error) {
