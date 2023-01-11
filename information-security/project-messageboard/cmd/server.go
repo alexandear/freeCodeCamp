@@ -35,7 +35,7 @@ func ExecServer(embeddedFiles embed.FS) {
 	r.Use(middleware.SetHeader("X-DNS-Prefetch-Control", "off"))
 	r.Use(middleware.SetHeader("X-Frame-Options", "SAMEORIGIN"))
 	r.Use(middleware.SetHeader("Referrer-Policy", "same-origin"))
-	r.Get("/_api/app-info", func(w http.ResponseWriter, r *http.Request) {})
+	fcc.RegistersHandlers(r)
 
 	publicFS, err := fs.Sub(embeddedFiles, "public")
 	if err != nil {

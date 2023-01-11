@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	chi "github.com/go-chi/chi/v5"
 )
 
 func FCC() func(next http.Handler) http.Handler {
@@ -31,4 +33,13 @@ func FCC() func(next http.Handler) http.Handler {
 		}
 		return http.HandlerFunc(fn)
 	}
+}
+
+func RegistersHandlers(r *chi.Mux) {
+	r.Get("/_api/app-info", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	r.Get("/_api/get-tests", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 }
