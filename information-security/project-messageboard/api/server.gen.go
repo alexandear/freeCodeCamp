@@ -16,6 +16,9 @@ import (
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Returns an existing thread
+	// (GET /api/threads/{board})
+	GetThread(w http.ResponseWriter, r *http.Request, board Board)
 	// Creates a new thread
 	// (POST /api/threads/{board})
 	CreateThread(w http.ResponseWriter, r *http.Request, board Board)
@@ -29,6 +32,32 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetThread operation middleware
+func (siw *ServerInterfaceWrapper) GetThread(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "board" -------------
+	var board Board
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "board", runtime.ParamLocationPath, chi.URLParam(r, "board"), &board)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "board", Err: err})
+		return
+	}
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetThread(w, r, board)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // CreateThread operation middleware
 func (siw *ServerInterfaceWrapper) CreateThread(w http.ResponseWriter, r *http.Request) {
@@ -170,6 +199,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/threads/{board}", wrapper.GetThread)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/threads/{board}", wrapper.CreateThread)
 	})
 
@@ -177,6 +209,36 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 }
 
 type DefaultTextResponse string
+
+type GetThreadRequestObject struct {
+	Board Board `json:"board"`
+}
+
+type GetThreadResponseObject interface {
+	VisitGetThreadResponse(w http.ResponseWriter) error
+}
+
+type GetThread200JSONResponse ThreadResp
+
+func (response GetThread200JSONResponse) VisitGetThreadResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetThreaddefaultTextResponse struct {
+	Body       string
+	StatusCode int
+}
+
+func (response GetThreaddefaultTextResponse) VisitGetThreadResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(response.StatusCode)
+
+	_, err := w.Write([]byte(response.Body))
+	return err
+}
 
 type CreateThreadRequestObject struct {
 	Board        Board `json:"board"`
@@ -188,7 +250,7 @@ type CreateThreadResponseObject interface {
 	VisitCreateThreadResponse(w http.ResponseWriter) error
 }
 
-type CreateThread200JSONResponse CreateThreadResp
+type CreateThread200JSONResponse ThreadResp
 
 func (response CreateThread200JSONResponse) VisitCreateThreadResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
@@ -212,6 +274,9 @@ func (response CreateThreaddefaultTextResponse) VisitCreateThreadResponse(w http
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Returns an existing thread
+	// (GET /api/threads/{board})
+	GetThread(ctx context.Context, request GetThreadRequestObject) (GetThreadResponseObject, error)
 	// Creates a new thread
 	// (POST /api/threads/{board})
 	CreateThread(ctx context.Context, request CreateThreadRequestObject) (CreateThreadResponseObject, error)
@@ -245,6 +310,32 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetThread operation middleware
+func (sh *strictHandler) GetThread(w http.ResponseWriter, r *http.Request, board Board) {
+	var request GetThreadRequestObject
+
+	request.Board = board
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetThread(ctx, request.(GetThreadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetThread")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetThreadResponseObject); ok {
+		if err := validResponse.VisitGetThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("Unexpected response type: %T", response))
+	}
 }
 
 // CreateThread operation middleware

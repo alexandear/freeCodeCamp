@@ -27,7 +27,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateThreadResp"
+                $ref: "#/components/schemas/ThreadResp"
+        default:
+          $ref: "#/components/responses/Default"
+    get:
+      summary: Returns an existing thread
+      operationId: getThread
+      parameters:
+        - $ref: "#/components/parameters/Board"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreadResp"
         default:
           $ref: "#/components/responses/Default"
 
@@ -44,7 +58,7 @@ components:
         - text
         - delete_password
 
-    CreateThreadResp:
+    ThreadResp:
       type: object
       properties:
         _id:

@@ -23,6 +23,22 @@ func NewServer(threadServ *thread.Service) *Server {
 	}
 }
 
+func (s *Server) GetThread(ctx context.Context, req api.GetThreadRequestObject) (api.GetThreadResponseObject, error) {
+	res, err := s.threadServ.Thread(ctx, req.Board)
+	if err != nil {
+		return nil, fmt.Errorf("get thread: %w", err)
+	}
+
+	return api.GetThread200JSONResponse{
+		Id:        res.ThreadID,
+		BumpedOn:  res.BumpedOn,
+		CreatedOn: res.CreatedOn,
+		Replies:   res.Replies,
+		Reported:  res.IsReported,
+		Text:      res.Text,
+	}, nil
+}
+
 func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestObject,
 ) (api.CreateThreadResponseObject, error) {
 	body := req.JSONBody

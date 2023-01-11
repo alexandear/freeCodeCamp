@@ -41,6 +41,9 @@ func TestCreateNewThread(t *testing.T) {
 		"text":            {"Some text."},
 		"delete_password": {"p@ssw0rd"},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if http.StatusOK != res.StatusCode {
 		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
@@ -54,7 +57,7 @@ func TestCreateNewThread(t *testing.T) {
 	res.Body = io.NopCloser(bytes.NewBuffer(resBytes))
 	actual := string(resBytes)
 
-	var resp api.CreateThreadResp
+	var resp api.ThreadResp
 	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
 		t.Fatal(err)
 	}
@@ -66,6 +69,24 @@ func TestCreateNewThread(t *testing.T) {
 	if expected != actual {
 		t.Fatalf("expected %+v, got %+v", expected, actual)
 	}
+
+	res, err = client.Get(s.URL + "/api/threads/board_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	}
+
+	resBytes, err = io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	res.Body = io.NopCloser(bytes.NewBuffer(resBytes))
+	actual = string(resBytes)
+	t.Log(actual)
 }
 
 func newTestMongoDatabase() *mongo.Database {
