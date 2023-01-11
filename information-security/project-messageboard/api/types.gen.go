@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// CreateThreadForm defines model for CreateThreadForm.
-type CreateThreadForm struct {
+// CreateThreadBody defines model for CreateThreadBody.
+type CreateThreadBody struct {
 	DeletePassword string `json:"delete_password"`
 	Text           string `json:"text"`
 }
@@ -26,5 +26,8 @@ type CreateThreadResp struct {
 // Board defines model for Board.
 type Board = string
 
+// CreateThreadJSONRequestBody defines body for CreateThread for application/json ContentType.
+type CreateThreadJSONRequestBody = CreateThreadBody
+
 // CreateThreadFormdataRequestBody defines body for CreateThread for application/x-www-form-urlencoded ContentType.
-type CreateThreadFormdataRequestBody = CreateThreadForm
+type CreateThreadFormdataRequestBody = CreateThreadBody

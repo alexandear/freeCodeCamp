@@ -25,10 +25,14 @@ func NewServer(threadServ *thread.Service) *Server {
 
 func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestObject,
 ) (api.CreateThreadResponseObject, error) {
+	body := req.JSONBody
+	if req.FormdataBody != nil {
+		body = req.FormdataBody
+	}
 	res, err := s.threadServ.CreateThread(ctx, thread.CreateThreadParam{
 		Board:          req.Board,
-		Text:           req.Body.Text,
-		DeletePassword: req.Body.DeletePassword,
+		Text:           body.Text,
+		DeletePassword: body.DeletePassword,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create thread: %w", err)

@@ -17,7 +17,10 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: "#/components/schemas/CreateThreadForm"
+              $ref: "#/components/schemas/CreateThreadBody"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateThreadBody"
       responses:
         200:
           description: OK
@@ -30,7 +33,7 @@ paths:
 
 components:
   schemas:
-    CreateThreadForm:
+    CreateThreadBody:
       type: object
       properties:
         text:

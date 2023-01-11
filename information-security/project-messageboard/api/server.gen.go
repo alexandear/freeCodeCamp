@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/go-chi/chi/v5"
@@ -178,8 +179,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 type DefaultTextResponse string
 
 type CreateThreadRequestObject struct {
-	Board Board `json:"board"`
-	Body  *CreateThreadFormdataRequestBody
+	Board        Board `json:"board"`
+	JSONBody     *CreateThreadJSONRequestBody
+	FormdataBody *CreateThreadFormdataRequestBody
 }
 
 type CreateThreadResponseObject interface {
@@ -250,17 +252,26 @@ func (sh *strictHandler) CreateThread(w http.ResponseWriter, r *http.Request, bo
 	var request CreateThreadRequestObject
 
 	request.Board = board
-
-	if err := r.ParseForm(); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode formdata: %w", err))
-		return
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		var body CreateThreadJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
 	}
-	var body CreateThreadFormdataRequestBody
-	if err := runtime.BindForm(&body, r.Form, nil, nil); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't bind formdata: %w", err))
-		return
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+		if err := r.ParseForm(); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode formdata: %w", err))
+			return
+		}
+		var body CreateThreadFormdataRequestBody
+		if err := runtime.BindForm(&body, r.Form, nil, nil); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't bind formdata: %w", err))
+			return
+		}
+		request.FormdataBody = &body
 	}
-	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CreateThread(ctx, request.(CreateThreadRequestObject))
