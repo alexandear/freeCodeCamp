@@ -19,7 +19,6 @@ type Thread struct {
 	BumpedOn  time.Time `json:"bumped_on"`
 	CreatedOn time.Time `json:"created_on"`
 	Replies   []string  `json:"replies"`
-	Reported  bool      `json:"reported"`
 	Text      string    `json:"text"`
 }
 

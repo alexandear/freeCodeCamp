@@ -250,13 +250,12 @@ type CreateThreadResponseObject interface {
 	VisitCreateThreadResponse(w http.ResponseWriter) error
 }
 
-type CreateThread200JSONResponse Thread
+type CreateThread200Response struct {
+}
 
-func (response CreateThread200JSONResponse) VisitCreateThreadResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
+func (response CreateThread200Response) VisitCreateThreadResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
+	return nil
 }
 
 type CreateThreaddefaultTextResponse struct {

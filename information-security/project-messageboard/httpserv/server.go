@@ -35,7 +35,6 @@ func (s *Server) GetThreads(ctx context.Context, req api.GetThreadsRequestObject
 			BumpedOn:  res.BumpedOn,
 			CreatedOn: res.CreatedOn,
 			Replies:   res.Replies,
-			Reported:  res.IsReported,
 			Text:      res.Text,
 		},
 	}, nil
@@ -47,7 +46,7 @@ func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestOb
 	if req.FormdataBody != nil {
 		body = req.FormdataBody
 	}
-	res, err := s.threadServ.CreateThread(ctx, thread.CreateThreadParam{
+	err := s.threadServ.CreateThread(ctx, thread.CreateThreadParam{
 		Board:          req.Board,
 		Text:           body.Text,
 		DeletePassword: body.DeletePassword,
@@ -56,12 +55,5 @@ func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestOb
 		return nil, fmt.Errorf("create thread: %w", err)
 	}
 
-	return api.CreateThread200JSONResponse{
-		Id:        res.ThreadID,
-		BumpedOn:  res.BumpedOn,
-		CreatedOn: res.CreatedOn,
-		Replies:   res.Replies,
-		Reported:  res.IsReported,
-		Text:      res.Text,
-	}, nil
+	return api.CreateThread200Response{}, nil
 }

@@ -23,10 +23,6 @@ paths:
       responses:
         200:
           description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Thread"
         default:
           $ref: "#/components/responses/Default"
     get:
@@ -71,8 +67,6 @@ components:
         bumped_on:
           type: string
           format: date-time
-        reported:
-          type: boolean
         replies:
           type: array
           items:

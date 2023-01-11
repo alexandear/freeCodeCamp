@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -64,11 +63,11 @@ func (s *Service) Thread(ctx context.Context, board string) (ThreadRes, error) {
 	}, nil
 }
 
-func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (ThreadRes, error) {
+func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) error {
 	now := time.Now().UTC()
 	createdOn := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, time.UTC)
 
-	res, err := s.threads.InsertOne(ctx, bson.D{
+	_, err := s.threads.InsertOne(ctx, bson.D{
 		{"board", param.Board},
 		{"text", param.Text},
 		{"created_on", createdOn},
@@ -76,15 +75,8 @@ func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (Th
 		{"is_reported", false},
 	})
 	if err != nil {
-		return ThreadRes{}, fmt.Errorf("insert one: %w", err)
+		return fmt.Errorf("insert one: %w", err)
 	}
 
-	return ThreadRes{
-		ThreadID:   res.InsertedID.(primitive.ObjectID).Hex(),
-		Text:       param.Text,
-		CreatedOn:  createdOn,
-		BumpedOn:   createdOn,
-		IsReported: false,
-		Replies:    []string{},
-	}, nil
+	return nil
 }
