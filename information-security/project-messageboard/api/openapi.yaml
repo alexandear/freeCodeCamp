@@ -43,6 +43,30 @@ components:
 
     CreateThreadResp:
       type: object
+      properties:
+        _id:
+          type: string
+        text:
+          type: string
+        created_on:
+          type: string
+          format: date-time
+        bumped_on:
+          type: string
+          format: date-time
+        reported:
+          type: boolean
+        replies:
+          type: array
+          items:
+            type: string
+      required:
+        - _id
+        - text
+        - created_on
+        - bumped_on
+        - reported
+        - replies
 
   parameters:
     Board:

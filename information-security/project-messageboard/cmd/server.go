@@ -17,7 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"messageboard/api"
-	httpserv "messageboard/http"
+	"messageboard/httpserv"
 	"messageboard/internal/fcc"
 	"messageboard/thread"
 )
