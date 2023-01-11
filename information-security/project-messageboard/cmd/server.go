@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 	"strconv"
@@ -17,7 +19,7 @@ type Config struct {
 	Environment string `env:"ENVIRONMENT"`
 }
 
-func ExecServer() {
+func ExecServer(embeddedFiles embed.FS) {
 	var cfg Config
 	if err := env.Parse(&cfg); err != nil {
 		log.Fatalf("Parse env: %v", err)
@@ -26,6 +28,17 @@ func ExecServer() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(cors.AllowAll().Handler)
+
+	publicFS, err := fs.Sub(embeddedFiles, "public")
+	if err != nil {
+		log.Fatalf("sub public: %v", err)
+	}
+	r.Handle("/public/*", http.StripPrefix("/public", http.FileServer(http.FS(publicFS))))
+	viewsFS, err := fs.Sub(embeddedFiles, "views")
+	if err != nil {
+		log.Fatalf("sub views: %v", err)
+	}
+	r.Handle("/*", http.FileServer(http.FS(viewsFS)))
 
 	host := ""
 	if cfg.Environment == "local" {
