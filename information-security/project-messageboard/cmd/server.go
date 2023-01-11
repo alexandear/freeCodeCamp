@@ -32,6 +32,9 @@ func ExecServer(embeddedFiles embed.FS) {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(cors.AllowAll().Handler, fcc.FCC()) // for testing purposes
+	r.Use(middleware.SetHeader("X-DNS-Prefetch-Control", "off"))
+	r.Use(middleware.SetHeader("X-Frame-Options", "SAMEORIGIN"))
+	r.Use(middleware.SetHeader("Referrer-Policy", "same-origin"))
 	r.Get("/_api/app-info", func(w http.ResponseWriter, r *http.Request) {})
 
 	publicFS, err := fs.Sub(embeddedFiles, "public")
