@@ -13,8 +13,8 @@ type CreateThreadBody struct {
 	Text           string `json:"text"`
 }
 
-// ThreadResp defines model for ThreadResp.
-type ThreadResp struct {
+// Thread defines model for Thread.
+type Thread struct {
 	Id        string    `json:"_id"`
 	BumpedOn  time.Time `json:"bumped_on"`
 	CreatedOn time.Time `json:"created_on"`

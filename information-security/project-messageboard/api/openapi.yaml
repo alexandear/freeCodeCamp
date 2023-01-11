@@ -8,7 +8,6 @@ servers:
 paths:
   /api/threads/{board}:
     post:
-      summary: Creates a new thread
       operationId: createThread
       parameters:
         - $ref: "#/components/parameters/Board"
@@ -27,12 +26,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ThreadResp"
+                $ref: "#/components/schemas/Thread"
         default:
           $ref: "#/components/responses/Default"
     get:
-      summary: Returns an existing thread
-      operationId: getThread
+      operationId: getThreads
       parameters:
         - $ref: "#/components/parameters/Board"
       responses:
@@ -41,7 +39,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ThreadResp"
+                type: array
+                items:
+                  $ref: "#/components/schemas/Thread"
         default:
           $ref: "#/components/responses/Default"
 
@@ -58,7 +58,7 @@ components:
         - text
         - delete_password
 
-    ThreadResp:
+    Thread:
       type: object
       properties:
         _id:

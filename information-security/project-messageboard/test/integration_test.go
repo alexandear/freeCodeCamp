@@ -57,7 +57,7 @@ func TestCreateNewThread(t *testing.T) {
 	res.Body = io.NopCloser(bytes.NewBuffer(resBytes))
 	actual := string(resBytes)
 
-	var resp api.ThreadResp
+	var resp api.Thread
 	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
 		t.Fatal(err)
 	}
