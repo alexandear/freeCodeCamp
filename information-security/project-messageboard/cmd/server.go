@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"embed"
 	"io/fs"
 	"log"
@@ -12,15 +13,20 @@ import (
 	chi "github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"messageboard/api"
 	httpserv "messageboard/http"
 	"messageboard/internal/fcc"
+	"messageboard/thread"
 )
 
 type Config struct {
 	Port        int    `env:"PORT"`
 	Environment string `env:"ENVIRONMENT"`
+	MongodbURI  string `env:"MONGODB_URI"`
+	MongodbName string `env:"MONGODB_NAME" envDefault:"message_board"`
 }
 
 func ExecServer(embeddedFiles embed.FS) {
@@ -48,8 +54,31 @@ func ExecServer(embeddedFiles embed.FS) {
 	}
 	r.Handle("/*", http.FileServer(http.FS(viewsFS)))
 
-	serv := httpserv.NewServer()
-	api.HandlerFromMux(serv, r)
+	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
+	clientOptions := options.Client().ApplyURI(cfg.MongodbURI).SetServerAPIOptions(serverAPIOptions)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	mongoClient, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		log.Fatalf("mongo client connect: %v", err)
+	}
+	defer func() {
+		dCtx, dCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer dCancel()
+
+		if err := mongoClient.Disconnect(dCtx); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	mongoDB := mongoClient.Database(cfg.MongodbName)
+
+	threadServ := thread.NewService(mongoDB)
+	serv := httpserv.NewServer(threadServ)
+	strictHandler := api.NewStrictHandler(serv, nil)
+	api.HandlerFromMux(strictHandler, r)
 
 	host := ""
 	if cfg.Environment == "local" {

@@ -6,15 +6,18 @@ servers:
   - url: http://localhost:8080
     description: Local
 paths:
-  /api/threads:
+  /api/threads/{board}:
     post:
       summary: Creates a new thread
       operationId: createThread
+      parameters:
+        - $ref: "#/components/parameters/Board"
       requestBody:
+        required: true
         content:
-          application/json:
+          application/x-www-form-urlencoded:
             schema:
-              $ref: "#/components/schemas/CreateThreadParam"
+              $ref: "#/components/schemas/CreateThreadForm"
       responses:
         200:
           description: OK
@@ -27,41 +30,32 @@ paths:
 
 components:
   schemas:
-    CreateThreadParam:
+    CreateThreadForm:
       type: object
+      properties:
+        text:
+          type: string
+        delete_password:
+          type: string
+      required:
+        - text
+        - delete_password
 
     CreateThreadResp:
       type: object
 
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          $ref: "#/components/schemas/Error"
-      required:
-        - error
-
-    Error:
-      required:
-        - code
-        - message
-      properties:
-        code:
-          type: string
-          description: |
-            Error codes:
-              - "NOT_FOUND" - not found by id
-              - "REQUEST_INVALID" - request fields has invalid types
-              - "ALREADY_EXISTS" - returns when you create something which is already exists in storage
-              - "INTERNAL_ERROR" - return when service has unexpected error
-        message:
-          type: string
-          description: Error message
+  parameters:
+    Board:
+      name: board
+      in: path
+      required: true
+      schema:
+        type: string
 
   responses:
     Default:
       description: Unexpected server error
       content:
-        application/json:
+        text/plain:
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
+            type: string

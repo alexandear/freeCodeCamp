@@ -1,6 +1,5 @@
-output:
-  ./../api/server.gen.go
-generate:
-  - chi-server
-  - spec
 package: api
+generate:
+  chi-server: true
+  strict-server: true
+output: ./../api/server.gen.go

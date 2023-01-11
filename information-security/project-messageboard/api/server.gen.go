@@ -4,24 +4,20 @@
 package api
 
 import (
-	"bytes"
-	"compress/gzip"
-	"encoding/base64"
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
-	"path"
-	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/go-chi/chi/v5"
 )
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Creates a new thread
-	// (POST /api/threads)
-	CreateThread(w http.ResponseWriter, r *http.Request)
+	// (POST /api/threads/{board})
+	CreateThread(w http.ResponseWriter, r *http.Request, board Board)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -37,8 +33,19 @@ type MiddlewareFunc func(http.Handler) http.Handler
 func (siw *ServerInterfaceWrapper) CreateThread(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var err error
+
+	// ------------- Path parameter "board" -------------
+	var board Board
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "board", runtime.ParamLocationPath, chi.URLParam(r, "board"), &board)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "board", Err: err})
+		return
+	}
+
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateThread(w, r)
+		siw.Handler.CreateThread(w, r, board)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -162,96 +169,115 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/threads", wrapper.CreateThread)
+		r.Post(options.BaseURL+"/api/threads/{board}", wrapper.CreateThread)
 	})
 
 	return r
 }
 
-// Base64 encoded, gzipped, json marshaled Swagger object
-var swaggerSpec = []string{
+type DefaultTextResponse string
 
-	"H4sIAAAAAAAC/7RUS2/bOBD+K4PZPSqRd/cS6OZsVMCoa6eKU7SIA4ORxhYDiWQ5VBIh0H8vSEbOwyl6",
-	"aU+i5vnNN49HLHVrtCLlGLNHtMRGK6bwc0Zb0TXOP0utHKnwFMY0shROapXeslZexmVNrfCvvy1tMcO/",
-	"0ue4adRymlurbfGUAYdhSLAiLq00PhhmeKnowVDpqAIme0cWyLugt3wK4nP8b0k4WtWWRHUurGi90PWG",
-	"MEN9c0ulwyF5ZeWTvmsUIHmNsdqQdTJWXuqK/Pc1vGAMXsfZWgEcwRoXy9Xmw/JycbZGOAKlHWx1pyq4",
-	"6UFWo1GRf77ML1ab2eLLdD6Lppa+d8QOtpKaiqEWDFLdiUZW4FHy6DudF/n07Nsm/zq7WF08ubrOKob7",
-	"mhT0uoMylAqsW3K1VDu4r2VZg2QQjS+/B3qQ7HwGYKet2NEYfrZY5cViOt/kRbEsXoSP0X0bZEkBXvfc",
-	"ndCWtcJkZJSdlWrnGW2JWex+yt6oPvAcEvSUSEsVZlexA8/Rrsde7cfnoGc0tvKXI3iQLLpeJ2/nw9tJ",
-	"tdVhdKRrvG6qtOpb3TF8itjgVAtbwfR8hgnekeVY7j/Hk+OJJ0QbUsJIzPC/IErQCFcHyKkwMnVhQsO/",
-	"0RxWzJcVFmxWYfZqkDECJ3anuup/22YebtQwRJJenIN/J5M/kjAs5zvXYPkRg2x/hN4LuEeYjtcqHIuu",
-	"bYXt9+QxCFB0D5HrmCxeGMbs6u2kznUpGkywsw1mWDtnsjRtvLDW7LKTyckEh+vhRwAAAP//KalnijwF",
-	"AAA=",
+type CreateThreadRequestObject struct {
+	Board Board `json:"board"`
+	Body  *CreateThreadFormdataRequestBody
 }
 
-// GetSwagger returns the content of the embedded swagger specification file
-// or error if failed to decode
-func decodeSpec() ([]byte, error) {
-	zipped, err := base64.StdEncoding.DecodeString(strings.Join(swaggerSpec, ""))
+type CreateThreadResponseObject interface {
+	VisitCreateThreadResponse(w http.ResponseWriter) error
+}
+
+type CreateThread200JSONResponse CreateThreadResp
+
+func (response CreateThread200JSONResponse) VisitCreateThreadResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateThreaddefaultTextResponse struct {
+	Body       string
+	StatusCode int
+}
+
+func (response CreateThreaddefaultTextResponse) VisitCreateThreadResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(response.StatusCode)
+
+	_, err := w.Write([]byte(response.Body))
+	return err
+}
+
+// StrictServerInterface represents all server handlers.
+type StrictServerInterface interface {
+	// Creates a new thread
+	// (POST /api/threads/{board})
+	CreateThread(ctx context.Context, request CreateThreadRequestObject) (CreateThreadResponseObject, error)
+}
+
+type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, args interface{}) (interface{}, error)
+
+type StrictMiddlewareFunc func(f StrictHandlerFunc, operationID string) StrictHandlerFunc
+
+type StrictHTTPServerOptions struct {
+	RequestErrorHandlerFunc  func(w http.ResponseWriter, r *http.Request, err error)
+	ResponseErrorHandlerFunc func(w http.ResponseWriter, r *http.Request, err error)
+}
+
+func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareFunc) ServerInterface {
+	return &strictHandler{ssi: ssi, middlewares: middlewares, options: StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		},
+	}}
+}
+
+func NewStrictHandlerWithOptions(ssi StrictServerInterface, middlewares []StrictMiddlewareFunc, options StrictHTTPServerOptions) ServerInterface {
+	return &strictHandler{ssi: ssi, middlewares: middlewares, options: options}
+}
+
+type strictHandler struct {
+	ssi         StrictServerInterface
+	middlewares []StrictMiddlewareFunc
+	options     StrictHTTPServerOptions
+}
+
+// CreateThread operation middleware
+func (sh *strictHandler) CreateThread(w http.ResponseWriter, r *http.Request, board Board) {
+	var request CreateThreadRequestObject
+
+	request.Board = board
+
+	if err := r.ParseForm(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode formdata: %w", err))
+		return
+	}
+	var body CreateThreadFormdataRequestBody
+	if err := runtime.BindForm(&body, r.Form, nil, nil); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't bind formdata: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateThread(ctx, request.(CreateThreadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateThread")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
 	if err != nil {
-		return nil, fmt.Errorf("error base64 decoding spec: %s", err)
-	}
-	zr, err := gzip.NewReader(bytes.NewReader(zipped))
-	if err != nil {
-		return nil, fmt.Errorf("error decompressing spec: %s", err)
-	}
-	var buf bytes.Buffer
-	_, err = buf.ReadFrom(zr)
-	if err != nil {
-		return nil, fmt.Errorf("error decompressing spec: %s", err)
-	}
-
-	return buf.Bytes(), nil
-}
-
-var rawSpec = decodeSpecCached()
-
-// a naive cached of a decoded swagger spec
-func decodeSpecCached() func() ([]byte, error) {
-	data, err := decodeSpec()
-	return func() ([]byte, error) {
-		return data, err
-	}
-}
-
-// Constructs a synthetic filesystem for resolving external references when loading openapi specifications.
-func PathToRawSpec(pathToFile string) map[string]func() ([]byte, error) {
-	var res = make(map[string]func() ([]byte, error))
-	if len(pathToFile) > 0 {
-		res[pathToFile] = rawSpec
-	}
-
-	return res
-}
-
-// GetSwagger returns the Swagger specification corresponding to the generated code
-// in this file. The external references of Swagger specification are resolved.
-// The logic of resolving external references is tightly connected to "import-mapping" feature.
-// Externally referenced files must be embedded in the corresponding golang packages.
-// Urls can be supported but this task was out of the scope.
-func GetSwagger() (swagger *openapi3.T, err error) {
-	var resolvePath = PathToRawSpec("")
-
-	loader := openapi3.NewLoader()
-	loader.IsExternalRefsAllowed = true
-	loader.ReadFromURIFunc = func(loader *openapi3.Loader, url *url.URL) ([]byte, error) {
-		var pathToFile = url.String()
-		pathToFile = path.Clean(pathToFile)
-		getSpec, ok := resolvePath[pathToFile]
-		if !ok {
-			err1 := fmt.Errorf("path not found: %s", pathToFile)
-			return nil, err1
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateThreadResponseObject); ok {
+		if err := validResponse.VisitCreateThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
-		return getSpec()
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("Unexpected response type: %T", response))
 	}
-	var specData []byte
-	specData, err = rawSpec()
-	if err != nil {
-		return
-	}
-	swagger, err = loader.LoadFromData(specData)
-	if err != nil {
-		return
-	}
-	return
 }
