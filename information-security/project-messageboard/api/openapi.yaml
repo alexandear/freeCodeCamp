@@ -1,0 +1,67 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Anonymous Message Board API
+servers:
+  - url: http://localhost:8080
+    description: Local
+paths:
+  /api/threads:
+    post:
+      summary: Creates a new thread
+      operationId: createThread
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateThreadParam"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateThreadResp"
+        default:
+          $ref: "#/components/responses/Default"
+
+components:
+  schemas:
+    CreateThreadParam:
+      type: object
+
+    CreateThreadResp:
+      type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: "#/components/schemas/Error"
+      required:
+        - error
+
+    Error:
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: |
+            Error codes:
+              - "NOT_FOUND" - not found by id
+              - "REQUEST_INVALID" - request fields has invalid types
+              - "ALREADY_EXISTS" - returns when you create something which is already exists in storage
+              - "INTERNAL_ERROR" - return when service has unexpected error
+        message:
+          type: string
+          description: Error message
+
+  responses:
+    Default:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

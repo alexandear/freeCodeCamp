@@ -12,6 +12,9 @@ import (
 	chi "github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+
+	"messageboard/api"
+	httpserv "messageboard/http"
 )
 
 type Config struct {
@@ -39,6 +42,9 @@ func ExecServer(embeddedFiles embed.FS) {
 		log.Fatalf("sub views: %v", err)
 	}
 	r.Handle("/*", http.FileServer(http.FS(viewsFS)))
+
+	serv := httpserv.NewServer()
+	api.HandlerFromMux(serv, r)
 
 	host := ""
 	if cfg.Environment == "local" {
