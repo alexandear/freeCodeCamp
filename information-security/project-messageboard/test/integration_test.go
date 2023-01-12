@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -28,6 +29,10 @@ var (
 	db     = newTestMongoDatabase()
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 func TestCreateNewThread(t *testing.T) {
 	threadServ := thread.NewService(db)
 	serv := httpserv.NewServer(threadServ)
@@ -37,10 +42,32 @@ func TestCreateNewThread(t *testing.T) {
 	s := httptest.NewServer(r)
 	defer s.Close()
 
-	res, err := client.PostForm(s.URL+"/api/threads/board_test", url.Values{
-		"text":            {"Some text."},
-		"delete_password": {"p@ssw0rd"},
-	})
+	var res *http.Response
+	var err error
+	ifForm := rand.Int()%2 == 0
+	if ifForm {
+		t.Log("post form data")
+		res, err = client.PostForm(s.URL+"/api/threads/board_test", url.Values{
+			"text":            {"Some text."},
+			"delete_password": {"p@ssw0rd"},
+		})
+	} else {
+		t.Log("post json data")
+		body, _ := json.Marshal(api.CreateThreadBody{
+			DeletePassword: "p@ssw0rd",
+			Text:           "Some text.",
+		})
+		res, err = client.Post(s.URL+"/api/threads/board_test", "application/json", bytes.NewReader(body))
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	}
+
+	res, err = client.Get(s.URL + "/api/threads/board_test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,36 +84,24 @@ func TestCreateNewThread(t *testing.T) {
 	res.Body = io.NopCloser(bytes.NewBuffer(resBytes))
 	actual := string(resBytes)
 
-	var resp api.Thread
-	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+	var threads []api.Thread
+	if err := json.NewDecoder(res.Body).Decode(&threads); err != nil {
 		t.Fatal(err)
 	}
 	_ = res.Body.Close()
 
-	createdOn := resp.CreatedOn.Format(time.RFC3339)
-	expected := fmt.Sprintf(`{"_id":"%s","bumped_on":"%s","created_on":"%s","replies":[],"reported":false,"text":"Some text."}
-`, resp.Id, createdOn, createdOn)
+	createdOn := threads[0].CreatedOn.Format(time.RFC3339)
+	bumpedOn := threads[0].BumpedOn.Format(time.RFC3339)
+	expected := fmt.Sprintf(`[{"_id":"%s","bumped_on":"%s","created_on":"%s","replies":[],"text":"Some text."}]
+`, threads[0].Id, bumpedOn, createdOn)
 	if expected != actual {
 		t.Fatalf("expected %+v, got %+v", expected, actual)
-	}
-
-	res, err = client.Get(s.URL + "/api/threads/board_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if http.StatusOK != res.StatusCode {
-		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
 	}
 
 	resBytes, err = io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = res.Body.Close()
-	res.Body = io.NopCloser(bytes.NewBuffer(resBytes))
-	actual = string(resBytes)
-	t.Log(actual)
 }
 
 func newTestMongoDatabase() *mongo.Database {
