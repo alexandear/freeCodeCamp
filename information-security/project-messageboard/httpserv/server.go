@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"messageboard/api"
-	"messageboard/thread"
+	"messageboard/msgboard"
 )
 
 //go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4 --config=types.cfg.yaml ../api/openapi.yaml
@@ -14,19 +14,19 @@ import (
 var _ api.StrictServerInterface = &Server{}
 
 type Server struct {
-	threadServ *thread.Service
+	msgServ *msgboard.Service
 }
 
-func NewServer(threadServ *thread.Service) *Server {
+func NewServer(msgServ *msgboard.Service) *Server {
 	return &Server{
-		threadServ: threadServ,
+		msgServ: msgServ,
 	}
 }
 
 func (s *Server) GetThreads(ctx context.Context, req api.GetThreadsRequestObject) (api.GetThreadsResponseObject, error) {
-	threads, err := s.threadServ.Threads(ctx, req.Board)
+	threads, err := s.msgServ.Threads(ctx, req.Board)
 	if err != nil {
-		return nil, fmt.Errorf("get thread: %w", err)
+		return nil, fmt.Errorf("get msgboard: %w", err)
 	}
 
 	res := make(api.GetThreads200JSONResponse, 0, len(threads))
@@ -58,13 +58,13 @@ func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestOb
 	if req.FormdataBody != nil {
 		body = req.FormdataBody
 	}
-	err := s.threadServ.CreateThread(ctx, thread.CreateThreadParam{
+	err := s.msgServ.CreateThread(ctx, msgboard.CreateThreadParam{
 		Board:          req.Board,
 		Text:           body.Text,
 		DeletePassword: body.DeletePassword,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create thread: %w", err)
+		return nil, fmt.Errorf("create msgboard: %w", err)
 	}
 
 	return api.CreateThread200Response{}, nil
@@ -75,7 +75,7 @@ func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObje
 	if req.FormdataBody != nil {
 		body = req.FormdataBody
 	}
-	err := s.threadServ.CreateReply(ctx, thread.CreateReplyParam{
+	err := s.msgServ.CreateReply(ctx, msgboard.CreateReplyParam{
 		ThreadID:       body.ThreadId,
 		Board:          req.Board,
 		Text:           body.Text,

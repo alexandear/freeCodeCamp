@@ -1,4 +1,4 @@
-package thread
+package msgboard
 
 import (
 	"context"
@@ -13,9 +13,6 @@ import (
 )
 
 const (
-	ThreadsCollection = "threads"
-	RepliesCollection = "replies"
-
 	maxReturnedThreadsCount = 10
 	maxReturnedRepliesCount = 3
 )
@@ -75,7 +72,7 @@ func (s *Service) Threads(ctx context.Context, board string) ([]ThreadRes, error
 	for _, dbThread := range dbThreads {
 		replies, err := s.RepliesForThread(ctx, dbThread.ThreadID)
 		if err != nil {
-			return nil, fmt.Errorf("replies for thread=%s: %w", dbThread.ThreadID, err)
+			return nil, fmt.Errorf("replies for msgboard=%s: %w", dbThread.ThreadID, err)
 		}
 
 		threads = append(threads, dbThread.ToThread(replies))

@@ -19,7 +19,7 @@ import (
 	"messageboard/api"
 	"messageboard/httpserv"
 	"messageboard/internal/fcc"
-	"messageboard/thread"
+	"messageboard/msgboard"
 )
 
 type Config struct {
@@ -75,8 +75,8 @@ func ExecServer(embeddedFiles embed.FS) {
 
 	mongoDB := mongoClient.Database(cfg.MongodbName)
 
-	threadServ := thread.NewService(mongoDB)
-	serv := httpserv.NewServer(threadServ)
+	msgServ := msgboard.NewService(mongoDB)
+	serv := httpserv.NewServer(msgServ)
 	strictHandler := api.NewStrictHandler(serv, nil)
 	api.HandlerFromMux(strictHandler, r)
 

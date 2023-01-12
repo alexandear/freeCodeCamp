@@ -19,8 +19,8 @@ import (
 
 	"messageboard/api"
 	"messageboard/httpserv"
+	"messageboard/msgboard"
 	clapi "messageboard/test/client/api"
-	"messageboard/thread"
 )
 
 //go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4 --config=client/client.cfg.yaml ../api/openapi.yaml
@@ -35,8 +35,8 @@ func init() {
 }
 
 func TestCreateNewThread(t *testing.T) {
-	threadServ := thread.NewService(db)
-	serv := httpserv.NewServer(threadServ)
+	msgServ := msgboard.NewService(db)
+	serv := httpserv.NewServer(msgServ)
 	r := chi.NewRouter()
 	strictHandler := api.NewStrictHandler(serv, nil)
 	api.HandlerFromMux(strictHandler, r)
@@ -78,8 +78,8 @@ func TestCreateNewThread(t *testing.T) {
 }
 
 func TestCreateReply(t *testing.T) {
-	threadServ := thread.NewService(db)
-	serv := httpserv.NewServer(threadServ)
+	msgServ := msgboard.NewService(db)
+	serv := httpserv.NewServer(msgServ)
 	r := chi.NewRouter()
 	strictHandler := api.NewStrictHandler(serv, nil)
 	api.HandlerFromMux(strictHandler, r)
@@ -150,8 +150,8 @@ func newTestMongoDatabase() *mongo.Database {
 
 	res := mongoClient.Database("test_message_board")
 
-	_, _ = res.Collection(thread.ThreadsCollection).DeleteMany(context.Background(), bson.D{{}})
-	_, _ = res.Collection(thread.RepliesCollection).DeleteMany(context.Background(), bson.D{{}})
+	_, _ = res.Collection(msgboard.ThreadsCollection).DeleteMany(context.Background(), bson.D{{}})
+	_, _ = res.Collection(msgboard.RepliesCollection).DeleteMany(context.Background(), bson.D{{}})
 
 	return res
 }

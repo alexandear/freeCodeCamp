@@ -1,7 +1,12 @@
-package thread
+package msgboard
 
 import (
 	"time"
+)
+
+const (
+	ThreadsCollection = "threads"
+	RepliesCollection = "replies"
 )
 
 type storageThread struct {
