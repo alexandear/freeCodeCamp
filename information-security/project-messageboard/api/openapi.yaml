@@ -41,6 +41,26 @@ paths:
         default:
           $ref: "#/components/responses/Default"
 
+  /api/replies/{board}:
+    post:
+      operationId: createReply
+      parameters:
+        - $ref: "#/components/parameters/Board"
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/CreateReplyBody"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReplyBody"
+      responses:
+        200:
+          description: OK
+        default:
+          $ref: "#/components/responses/Default"
+
 components:
   schemas:
     CreateThreadBody:
@@ -53,6 +73,30 @@ components:
       required:
         - text
         - delete_password
+    CreateReplyBody:
+      type: object
+      properties:
+        text:
+          type: string
+        delete_password:
+          type: string
+        thread_id:
+          type: string
+      required:
+        - text
+        - delete_password
+        - thread_id
+
+    Reply:
+      type: object
+      properties:
+        _id:
+          type: string
+        text:
+          type: string
+      required:
+        - _id
+        - text
 
     Thread:
       type: object
@@ -70,7 +114,7 @@ components:
         replies:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/Reply"
       required:
         - _id
         - text

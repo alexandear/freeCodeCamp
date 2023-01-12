@@ -2,19 +2,27 @@ package thread
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
 	ThreadsCollection = "threads"
+	RepliesCollection = "replies"
+
+	maxReturnedThreadsCount = 10
+	maxReturnedRepliesCount = 3
 )
 
 type Service struct {
 	threads *mongo.Collection
+	replies *mongo.Collection
 }
 
 type CreateThreadParam struct {
@@ -23,49 +31,61 @@ type CreateThreadParam struct {
 	DeletePassword string
 }
 
+type CreateReplyParam struct {
+	Board          string
+	Text           string
+	DeletePassword string
+	ThreadID       string
+}
+
 type ThreadRes struct {
 	ThreadID   string
 	Text       string
 	CreatedOn  time.Time
 	BumpedOn   time.Time
 	IsReported bool
-	Replies    []string
+	Replies    []ReplyRes
 }
 
-type storageThread struct {
-	ThreadID   string    `bson:"_id"`
-	Text       string    `bson:"text"`
-	CreatedOn  time.Time `bson:"created_on"`
-	BumpedOn   time.Time `bson:"bumped_on"`
-	IsReported bool      `bson:"is_reported"`
+type ReplyRes struct {
+	ReplyID  string
+	ThreadID string
+	Text     string
 }
 
 func NewService(db *mongo.Database) *Service {
 	return &Service{
 		threads: db.Collection(ThreadsCollection),
+		replies: db.Collection(RepliesCollection),
 	}
 }
 
-func (s *Service) Thread(ctx context.Context, board string) (ThreadRes, error) {
-	var thread storageThread
-	err := s.threads.FindOne(ctx, bson.D{{"board", board}}).Decode(&thread)
+func (s *Service) Threads(ctx context.Context, board string) ([]ThreadRes, error) {
+	cursor, err := s.threads.Find(ctx, bson.D{{"board", board}}, options.Find().SetLimit(maxReturnedThreadsCount))
 	if err != nil {
-		return ThreadRes{}, err
+		return nil, fmt.Errorf("find: %w", err)
 	}
 
-	return ThreadRes{
-		ThreadID:   thread.ThreadID,
-		Text:       thread.Text,
-		CreatedOn:  thread.CreatedOn,
-		BumpedOn:   thread.BumpedOn,
-		IsReported: thread.IsReported,
-		Replies:    []string{},
-	}, nil
+	dbThreads := make([]storageThread, 0, maxReturnedThreadsCount)
+	if err := cursor.All(ctx, &dbThreads); err != nil {
+		return nil, fmt.Errorf("cursor all: %w", err)
+	}
+
+	threads := make([]ThreadRes, 0, len(dbThreads))
+	for _, dbThread := range dbThreads {
+		replies, err := s.RepliesForThread(ctx, dbThread.ThreadID)
+		if err != nil {
+			return nil, fmt.Errorf("replies for thread=%s: %w", dbThread.ThreadID, err)
+		}
+
+		threads = append(threads, dbThread.ToThread(replies))
+	}
+
+	return threads, nil
 }
 
 func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) error {
-	now := time.Now().UTC()
-	createdOn := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, time.UTC)
+	createdOn := now()
 
 	_, err := s.threads.InsertOne(ctx, bson.D{
 		{"board", param.Board},
@@ -79,4 +99,57 @@ func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) err
 	}
 
 	return nil
+}
+
+func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) error {
+	threadObjectID, err := primitive.ObjectIDFromHex(param.ThreadID)
+	if err != nil {
+		return fmt.Errorf("wrong object id: %w", err)
+	}
+
+	n := now()
+	update := bson.D{{"$set", bson.D{{"bumped_on", n}}}}
+	_, err = s.threads.UpdateByID(ctx, threadObjectID, update)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf("board not found: %w", err)
+	}
+	if err != nil {
+		return fmt.Errorf("find one and update err: %w", err)
+	}
+
+	_, err = s.replies.InsertOne(ctx, bson.D{
+		{"thread_id", param.ThreadID},
+		{"text", param.Text},
+		{"created_on", n},
+		{"delete_password", param.DeletePassword},
+	})
+	if err != nil {
+		return fmt.Errorf("insert one: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) RepliesForThread(ctx context.Context, threadID string) ([]ReplyRes, error) {
+	cursor, err := s.replies.Find(ctx, bson.D{{"thread_id", threadID}}, options.Find().SetLimit(maxReturnedRepliesCount))
+	if err != nil {
+		return nil, fmt.Errorf("find: %w", err)
+	}
+
+	dbReplies := make([]storageReply, 0, maxReturnedRepliesCount)
+	if err := cursor.All(ctx, &dbReplies); err != nil {
+		return nil, fmt.Errorf("cursor all: %w", err)
+	}
+
+	replies := make([]ReplyRes, 0, len(dbReplies))
+	for _, dbReply := range dbReplies {
+		replies = append(replies, dbReply.ToReply())
+	}
+
+	return replies, nil
+}
+
+func now() time.Time {
+	now := time.Now().UTC()
+	return time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, time.UTC)
 }

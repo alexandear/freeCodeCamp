@@ -17,6 +17,9 @@ import (
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (POST /api/replies/{board})
+	CreateReply(w http.ResponseWriter, r *http.Request, board Board)
+
 	// (GET /api/threads/{board})
 	GetThreads(w http.ResponseWriter, r *http.Request, board Board)
 
@@ -32,6 +35,32 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// CreateReply operation middleware
+func (siw *ServerInterfaceWrapper) CreateReply(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "board" -------------
+	var board Board
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "board", runtime.ParamLocationPath, chi.URLParam(r, "board"), &board)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "board", Err: err})
+		return
+	}
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateReply(w, r, board)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // GetThreads operation middleware
 func (siw *ServerInterfaceWrapper) GetThreads(w http.ResponseWriter, r *http.Request) {
@@ -199,6 +228,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/replies/{board}", wrapper.CreateReply)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/threads/{board}", wrapper.GetThreads)
 	})
 	r.Group(func(r chi.Router) {
@@ -209,6 +241,37 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 }
 
 type DefaultTextResponse string
+
+type CreateReplyRequestObject struct {
+	Board        Board `json:"board"`
+	JSONBody     *CreateReplyJSONRequestBody
+	FormdataBody *CreateReplyFormdataRequestBody
+}
+
+type CreateReplyResponseObject interface {
+	VisitCreateReplyResponse(w http.ResponseWriter) error
+}
+
+type CreateReply200Response struct {
+}
+
+func (response CreateReply200Response) VisitCreateReplyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type CreateReplydefaultTextResponse struct {
+	Body       string
+	StatusCode int
+}
+
+func (response CreateReplydefaultTextResponse) VisitCreateReplyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(response.StatusCode)
+
+	_, err := w.Write([]byte(response.Body))
+	return err
+}
 
 type GetThreadsRequestObject struct {
 	Board Board `json:"board"`
@@ -274,6 +337,9 @@ func (response CreateThreaddefaultTextResponse) VisitCreateThreadResponse(w http
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
+	// (POST /api/replies/{board})
+	CreateReply(ctx context.Context, request CreateReplyRequestObject) (CreateReplyResponseObject, error)
+
 	// (GET /api/threads/{board})
 	GetThreads(ctx context.Context, request GetThreadsRequestObject) (GetThreadsResponseObject, error)
 
@@ -309,6 +375,52 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// CreateReply operation middleware
+func (sh *strictHandler) CreateReply(w http.ResponseWriter, r *http.Request, board Board) {
+	var request CreateReplyRequestObject
+
+	request.Board = board
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		var body CreateReplyJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+		if err := r.ParseForm(); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode formdata: %w", err))
+			return
+		}
+		var body CreateReplyFormdataRequestBody
+		if err := runtime.BindForm(&body, r.Form, nil, nil); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't bind formdata: %w", err))
+			return
+		}
+		request.FormdataBody = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateReply(ctx, request.(CreateReplyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateReply")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateReplyResponseObject); ok {
+		if err := validResponse.VisitCreateReplyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("Unexpected response type: %T", response))
+	}
 }
 
 // GetThreads operation middleware

@@ -24,20 +24,32 @@ func NewServer(threadServ *thread.Service) *Server {
 }
 
 func (s *Server) GetThreads(ctx context.Context, req api.GetThreadsRequestObject) (api.GetThreadsResponseObject, error) {
-	res, err := s.threadServ.Thread(ctx, req.Board)
+	threads, err := s.threadServ.Threads(ctx, req.Board)
 	if err != nil {
 		return nil, fmt.Errorf("get thread: %w", err)
 	}
 
-	return api.GetThreads200JSONResponse{
-		{
-			Id:        res.ThreadID,
-			BumpedOn:  res.BumpedOn,
-			CreatedOn: res.CreatedOn,
-			Replies:   res.Replies,
-			Text:      res.Text,
-		},
-	}, nil
+	res := make(api.GetThreads200JSONResponse, 0, len(threads))
+	for _, th := range threads {
+		resThread := api.Thread{
+			Id:        th.ThreadID,
+			BumpedOn:  th.BumpedOn,
+			CreatedOn: th.CreatedOn,
+			Text:      th.Text,
+			Replies:   []api.Reply{},
+		}
+
+		for _, r := range th.Replies {
+			resThread.Replies = append(resThread.Replies, api.Reply{
+				Id:   r.ReplyID,
+				Text: r.Text,
+			})
+		}
+
+		res = append(res, resThread)
+	}
+
+	return res, nil
 }
 
 func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestObject,
@@ -56,4 +68,22 @@ func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestOb
 	}
 
 	return api.CreateThread200Response{}, nil
+}
+
+func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObject) (api.CreateReplyResponseObject, error) {
+	body := req.JSONBody
+	if req.FormdataBody != nil {
+		body = req.FormdataBody
+	}
+	err := s.threadServ.CreateReply(ctx, thread.CreateReplyParam{
+		ThreadID:       body.ThreadId,
+		Board:          req.Board,
+		Text:           body.Text,
+		DeletePassword: body.DeletePassword,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create reply: %w", err)
+	}
+
+	return api.CreateReply200Response{}, nil
 }

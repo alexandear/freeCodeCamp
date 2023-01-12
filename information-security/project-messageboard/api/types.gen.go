@@ -7,10 +7,23 @@ import (
 	"time"
 )
 
+// CreateReplyBody defines model for CreateReplyBody.
+type CreateReplyBody struct {
+	DeletePassword string `json:"delete_password"`
+	Text           string `json:"text"`
+	ThreadId       string `json:"thread_id"`
+}
+
 // CreateThreadBody defines model for CreateThreadBody.
 type CreateThreadBody struct {
 	DeletePassword string `json:"delete_password"`
 	Text           string `json:"text"`
+}
+
+// Reply defines model for Reply.
+type Reply struct {
+	Id   string `json:"_id"`
+	Text string `json:"text"`
 }
 
 // Thread defines model for Thread.
@@ -18,12 +31,18 @@ type Thread struct {
 	Id        string    `json:"_id"`
 	BumpedOn  time.Time `json:"bumped_on"`
 	CreatedOn time.Time `json:"created_on"`
-	Replies   []string  `json:"replies"`
+	Replies   []Reply   `json:"replies"`
 	Text      string    `json:"text"`
 }
 
 // Board defines model for Board.
 type Board = string
+
+// CreateReplyJSONRequestBody defines body for CreateReply for application/json ContentType.
+type CreateReplyJSONRequestBody = CreateReplyBody
+
+// CreateReplyFormdataRequestBody defines body for CreateReply for application/x-www-form-urlencoded ContentType.
+type CreateReplyFormdataRequestBody = CreateReplyBody
 
 // CreateThreadJSONRequestBody defines body for CreateThread for application/json ContentType.
 type CreateThreadJSONRequestBody = CreateThreadBody
