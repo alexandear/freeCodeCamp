@@ -127,6 +127,7 @@ func TestCreateReply(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, *getResp.JSON200, 1)
 	thread := (*getResp.JSON200)[0]
+	assert.True(t, thread.BumpedOn.After(thread.CreatedOn))
 	assert.Len(t, thread.Replies, 1)
 	reply := thread.Replies[0]
 	assert.NotEmpty(t, reply.Id)

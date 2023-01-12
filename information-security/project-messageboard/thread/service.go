@@ -150,6 +150,5 @@ func (s *Service) RepliesForThread(ctx context.Context, threadID string) ([]Repl
 }
 
 func now() time.Time {
-	now := time.Now().UTC()
-	return time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, time.UTC)
+	return time.Now().UTC()
 }
