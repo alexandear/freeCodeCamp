@@ -1,35 +1,36 @@
 package test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"testing"
 	"time"
 
+	gofakeit "github.com/brianvoe/gofakeit/v6"
 	chi "github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"messageboard/api"
 	"messageboard/httpserv"
+	clapi "messageboard/test/client/api"
 	"messageboard/thread"
 )
 
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4 --config=client/client.cfg.yaml ../api/openapi.yaml
+
 var (
-	client = http.Client{Timeout: 2 * time.Second}
-	db     = newTestMongoDatabase()
+	db = newTestMongoDatabase()
 )
 
 func init() {
+	gofakeit.Seed(0)
 	rand.Seed(time.Now().UnixNano())
 }
 
@@ -42,58 +43,38 @@ func TestCreateNewThread(t *testing.T) {
 	s := httptest.NewServer(r)
 	defer s.Close()
 
-	var (
-		res *http.Response
-		err error
-	)
+	client, err := clapi.NewClientWithResponses(s.URL, clapi.WithHTTPClient(&http.Client{Timeout: 2 * time.Second}))
+	require.NoError(t, err)
+
+	board := gofakeit.Animal()
+	text := gofakeit.BuzzWord()
+	deletePassword := gofakeit.NounAbstract()
+
+	var createResp *clapi.CreateThreadResponse
+	createBody := clapi.CreateThreadJSONRequestBody{
+		Text:           text,
+		DeletePassword: deletePassword,
+	}
 	if rand.Int()%2 == 0 {
-		t.Log("post form data")
-		res, err = client.PostForm(s.URL+"/api/threads/board_test", url.Values{
-			"text":            {"Some text."},
-			"delete_password": {"p@ssw0rd"},
-		})
+		createResp, err = client.CreateThreadWithFormdataBodyWithResponse(context.Background(), board, createBody)
+		require.NoError(t, err)
 	} else {
-		t.Log("post json data")
-		body, _ := json.Marshal(api.CreateThreadBody{
-			DeletePassword: "p@ssw0rd",
-			Text:           "Some text.",
-		})
-		res, err = client.Post(s.URL+"/api/threads/board_test", "application/json", bytes.NewReader(body))
+		createResp, err = client.CreateThreadWithResponse(context.Background(), board, createBody)
+		require.NoError(t, err)
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Equal(t, createResp.StatusCode(), http.StatusOK)
 
-	if http.StatusOK != res.StatusCode {
-		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
-	}
+	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
+	require.NoError(t, err)
 
-	res, err = client.Get(s.URL + "/api/threads/board_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = res.Body.Close()
-	res.Body = io.NopCloser(bytes.NewBuffer(resBytes))
-	actual := string(resBytes)
-
-	var threads api.GetThreads200JSONResponse
-	if err := json.NewDecoder(res.Body).Decode(&threads); err != nil {
-		t.Fatal(err)
-	}
-	_ = res.Body.Close()
-
-	createdOn := threads[0].CreatedOn.Format(time.RFC3339)
-	bumpedOn := threads[0].BumpedOn.Format(time.RFC3339)
-	expected := fmt.Sprintf(`[{"_id":"%s","bumped_on":"%s","created_on":"%s","replies":[],"text":"Some text."}]
-`, threads[0].Id, bumpedOn, createdOn)
-	if expected != actual {
-		t.Fatalf("expected %+v, got %+v", expected, actual)
-	}
+	threads := *getResp.JSON200
+	require.Len(t, threads, 1)
+	thread := threads[0]
+	assert.NotEmpty(t, thread.Id)
+	assert.NotZero(t, thread.CreatedOn)
+	assert.Equal(t, thread.CreatedOn, thread.BumpedOn)
+	assert.Equal(t, text, thread.Text)
+	assert.Len(t, thread.Replies, 0)
 }
 
 func TestCreateReply(t *testing.T) {
@@ -105,88 +86,51 @@ func TestCreateReply(t *testing.T) {
 	s := httptest.NewServer(r)
 	defer s.Close()
 
-	func() {
-		if _, err := client.PostForm(s.URL+"/api/threads/board_reply", url.Values{
-			"text":            {"Board with replies."},
-			"delete_password": {"reply"},
-		}); err != nil {
-			t.Fatal()
-		}
+	client, err := clapi.NewClientWithResponses(s.URL, clapi.WithHTTPClient(&http.Client{Timeout: 2 * time.Second}))
+	require.NoError(t, err)
+
+	board := gofakeit.Animal()
+	threadText := gofakeit.BuzzWord()
+
+	threadID := func() string {
+		_, err := client.CreateThreadWithResponse(context.Background(), board, clapi.CreateThreadBody{
+			DeletePassword: gofakeit.NounAbstract(),
+			Text:           threadText,
+		})
+		require.NoError(t, err)
+
+		getResp, err := client.GetThreadsWithResponse(context.Background(), board)
+		require.NoError(t, err)
+		require.Len(t, *getResp.JSON200, 1)
+		return (*getResp.JSON200)[0].Id
 	}()
 
-	threadID := func(board string) string {
-		res, err := client.Get(s.URL + "/api/threads/board_reply")
-		if err != nil {
-			t.Fatal(err)
-		}
+	replyText := gofakeit.BuzzWord()
 
-		var threads api.GetThreads200JSONResponse
-		if err := json.NewDecoder(res.Body).Decode(&threads); err != nil {
-			t.Fatal(err)
-		}
-		_ = res.Body.Close()
-
-		return threads[0].Id
-	}("board_reply")
-
-	var (
-		res *http.Response
-		err error
-	)
+	var createResp *clapi.CreateReplyResponse
+	createBody := clapi.CreateReplyBody{
+		DeletePassword: gofakeit.NounAbstract(),
+		Text:           replyText,
+		ThreadId:       threadID,
+	}
 	if rand.Int()%2 == 0 {
-		t.Log("post form data")
-		res, err = client.PostForm(s.URL+"/api/replies/board_reply", url.Values{
-			"thread_id":       {threadID},
-			"text":            {"Some reply."},
-			"delete_password": {"p@ssw0rd_reply"},
-		})
+		createResp, err = client.CreateReplyWithFormdataBodyWithResponse(context.Background(), board, createBody)
+		require.NoError(t, err)
 	} else {
-		t.Log("post json data")
-		body, _ := json.Marshal(api.CreateReplyBody{
-			ThreadId:       threadID,
-			DeletePassword: "p@ssw0rd_reply",
-			Text:           "Some reply.",
-		})
-		res, err = client.Post(s.URL+"/api/threads/board_reply", "application/json", bytes.NewReader(body))
-	}
-	if err != nil {
-		t.Fatal(err)
+		createResp, err = client.CreateReplyWithResponse(context.Background(), board, createBody)
+		require.NoError(t, err)
 	}
 
-	if http.StatusOK != res.StatusCode {
-		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
-	}
+	assert.Equal(t, createResp.StatusCode(), http.StatusOK)
 
-	expected, actual := func() (string, string) {
-		res, err := client.Get(s.URL + "/api/threads/board_reply")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		resBytes, err := io.ReadAll(res.Body)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = res.Body.Close()
-		res.Body = io.NopCloser(bytes.NewBuffer(resBytes))
-		actual := string(resBytes)
-
-		var threads api.GetThreads200JSONResponse
-		if err := json.NewDecoder(res.Body).Decode(&threads); err != nil {
-			t.Fatal(err)
-		}
-		_ = res.Body.Close()
-
-		createdOn := threads[0].CreatedOn.Format(time.RFC3339)
-		bumpedOn := threads[0].BumpedOn.Format(time.RFC3339)
-		expected := fmt.Sprintf(`[{"_id":"%s","bumped_on":"%s","created_on":"%s","replies":[{"_id":"%s","text":"Some reply."}],"text":"Board with replies."}]
-`, threads[0].Id, bumpedOn, createdOn, threads[0].Replies[0].Id)
-		return expected, actual
-	}()
-
-	if expected != actual {
-		t.Fatalf("expected %+v, got %+v", expected, actual)
-	}
+	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
+	require.NoError(t, err)
+	require.Len(t, *getResp.JSON200, 1)
+	thread := (*getResp.JSON200)[0]
+	assert.Len(t, thread.Replies, 1)
+	reply := thread.Replies[0]
+	assert.NotEmpty(t, reply.Id)
+	assert.Equal(t, replyText, reply.Text)
 }
 
 func newTestMongoDatabase() *mongo.Database {
