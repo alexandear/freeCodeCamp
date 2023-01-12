@@ -59,6 +59,8 @@ func TestCreateNewThread(t *testing.T) {
 		require.NoError(t, err)
 	}
 	assert.Equal(t, createResp.StatusCode(), http.StatusFound)
+	threadID := string(createResp.Body)
+	assert.NotEmpty(t, threadID)
 
 	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
 	require.NoError(t, err)
@@ -66,7 +68,7 @@ func TestCreateNewThread(t *testing.T) {
 	threads := *getResp.JSON200
 	require.Len(t, threads, 1)
 	thread := threads[0]
-	assert.NotEmpty(t, thread.Id)
+	assert.Equal(t, threadID, thread.Id)
 	assert.NotZero(t, thread.CreatedOn)
 	assert.Equal(t, thread.CreatedOn, thread.BumpedOn)
 	assert.Equal(t, text, thread.Text)
@@ -83,16 +85,12 @@ func TestCreateReply(t *testing.T) {
 	threadText := gofakeit.BuzzWord()
 
 	threadID := func() string {
-		_, err := client.CreateThreadWithResponse(context.Background(), board, clapi.CreateThreadBody{
+		resp, err := client.CreateThreadWithResponse(context.Background(), board, clapi.CreateThreadBody{
 			DeletePassword: gofakeit.NounAbstract(),
 			Text:           threadText,
 		})
 		require.NoError(t, err)
-
-		getResp, err := client.GetThreadsWithResponse(context.Background(), board)
-		require.NoError(t, err)
-		require.Len(t, *getResp.JSON200, 1)
-		return (*getResp.JSON200)[0].Id
+		return string(resp.Body)
 	}()
 
 	replyText := gofakeit.BuzzWord()
@@ -114,6 +112,8 @@ func TestCreateReply(t *testing.T) {
 	}
 
 	assert.Equal(t, createResp.StatusCode(), http.StatusOK)
+	replyID := string(createResp.Body)
+	assert.NotEmpty(t, replyID)
 
 	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
 	require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestCreateReply(t *testing.T) {
 	assert.True(t, thread.BumpedOn.After(thread.CreatedOn))
 	assert.Len(t, thread.Replies, 1)
 	reply := thread.Replies[0]
-	assert.NotEmpty(t, reply.Id)
+	assert.Equal(t, replyID, reply.Id)
 	assert.Equal(t, replyText, reply.Text)
 }
 

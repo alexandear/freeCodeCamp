@@ -252,12 +252,14 @@ type CreateReplyResponseObject interface {
 	VisitCreateReplyResponse(w http.ResponseWriter) error
 }
 
-type CreateReply200Response struct {
-}
+type CreateReply200TextResponse string
 
-func (response CreateReply200Response) VisitCreateReplyResponse(w http.ResponseWriter) error {
+func (response CreateReply200TextResponse) VisitCreateReplyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(200)
-	return nil
+
+	_, err := w.Write([]byte(response))
+	return err
 }
 
 type CreateReplydefaultTextResponse struct {
@@ -313,12 +315,14 @@ type CreateThreadResponseObject interface {
 	VisitCreateThreadResponse(w http.ResponseWriter) error
 }
 
-type CreateThread302Response struct {
-}
+type CreateThread302TextResponse string
 
-func (response CreateThread302Response) VisitCreateThreadResponse(w http.ResponseWriter) error {
+func (response CreateThread302TextResponse) VisitCreateThreadResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(302)
-	return nil
+
+	_, err := w.Write([]byte(response))
+	return err
 }
 
 type CreateThreaddefaultTextResponse struct {

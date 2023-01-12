@@ -58,7 +58,7 @@ func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestOb
 	if req.FormdataBody != nil {
 		body = req.FormdataBody
 	}
-	err := s.msgServ.CreateThread(ctx, msgboard.CreateThreadParam{
+	threadID, err := s.msgServ.CreateThread(ctx, msgboard.CreateThreadParam{
 		Board:          req.Board,
 		Text:           body.Text,
 		DeletePassword: body.DeletePassword,
@@ -67,7 +67,7 @@ func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestOb
 		return nil, fmt.Errorf("create msgboard: %w", err)
 	}
 
-	return api.CreateThread302Response{}, nil
+	return api.CreateThread302TextResponse(threadID), nil
 }
 
 func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObject) (api.CreateReplyResponseObject, error) {
@@ -75,7 +75,7 @@ func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObje
 	if req.FormdataBody != nil {
 		body = req.FormdataBody
 	}
-	err := s.msgServ.CreateReply(ctx, msgboard.CreateReplyParam{
+	replyID, err := s.msgServ.CreateReply(ctx, msgboard.CreateReplyParam{
 		ThreadID:       body.ThreadId,
 		Board:          req.Board,
 		Text:           body.Text,
@@ -85,5 +85,5 @@ func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObje
 		return nil, fmt.Errorf("create reply: %w", err)
 	}
 
-	return api.CreateReply200Response{}, nil
+	return api.CreateReply200TextResponse(replyID), nil
 }

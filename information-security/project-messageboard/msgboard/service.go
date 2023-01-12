@@ -81,10 +81,12 @@ func (s *Service) Threads(ctx context.Context, board string) ([]ThreadRes, error
 	return threads, nil
 }
 
-func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) error {
+func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (string, error) {
 	createdOn := now()
 
+	threadID := primitive.NewObjectID()
 	_, err := s.threads.InsertOne(ctx, bson.D{
+		{"_id", threadID},
 		{"board", param.Board},
 		{"text", param.Text},
 		{"created_on", createdOn},
@@ -92,39 +94,42 @@ func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) err
 		{"is_reported", false},
 	})
 	if err != nil {
-		return fmt.Errorf("insert one: %w", err)
+		return "", fmt.Errorf("insert one: %w", err)
 	}
 
-	return nil
+	return threadID.Hex(), nil
 }
 
-func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) error {
+func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (string, error) {
 	threadObjectID, err := primitive.ObjectIDFromHex(param.ThreadID)
 	if err != nil {
-		return fmt.Errorf("wrong object id: %w", err)
+		return "", fmt.Errorf("wrong object id: %w", err)
 	}
 
 	n := now()
 	update := bson.D{{"$set", bson.D{{"bumped_on", n}}}}
 	_, err = s.threads.UpdateByID(ctx, threadObjectID, update)
 	if errors.Is(err, mongo.ErrNoDocuments) {
-		return fmt.Errorf("board not found: %w", err)
+		return "", fmt.Errorf("board not found: %w", err)
 	}
 	if err != nil {
-		return fmt.Errorf("find one and update err: %w", err)
+		return "", fmt.Errorf("find one and update err: %w", err)
 	}
 
+	replyID := primitive.NewObjectID()
+
 	_, err = s.replies.InsertOne(ctx, bson.D{
+		{"_id", replyID},
 		{"thread_id", param.ThreadID},
 		{"text", param.Text},
 		{"created_on", n},
 		{"delete_password", param.DeletePassword},
 	})
 	if err != nil {
-		return fmt.Errorf("insert one: %w", err)
+		return "", fmt.Errorf("insert one: %w", err)
 	}
 
-	return nil
+	return replyID.Hex(), nil
 }
 
 func (s *Service) RepliesForThread(ctx context.Context, threadID string) ([]ReplyRes, error) {

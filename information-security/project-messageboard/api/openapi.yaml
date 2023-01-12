@@ -23,6 +23,11 @@ paths:
       responses:
         302:
           description: Found
+          content:
+            text/plain:
+              schema:
+                description: Thread ID
+                type: string
         default:
           $ref: "#/components/responses/Default"
     get:
@@ -58,6 +63,11 @@ paths:
       responses:
         200:
           description: OK
+          content:
+            text/plain:
+              schema:
+                description: Reply ID
+                type: string
         default:
           $ref: "#/components/responses/Default"
 
