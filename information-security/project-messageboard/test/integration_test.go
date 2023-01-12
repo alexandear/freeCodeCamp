@@ -35,16 +35,10 @@ func init() {
 }
 
 func TestCreateNewThread(t *testing.T) {
-	msgServ := msgboard.NewService(db)
-	serv := httpserv.NewServer(msgServ)
-	r := chi.NewRouter()
-	strictHandler := api.NewStrictHandler(serv, nil)
-	api.HandlerFromMux(strictHandler, r)
-	s := httptest.NewServer(r)
+	s := newTestServer()
 	defer s.Close()
 
-	client, err := clapi.NewClientWithResponses(s.URL, clapi.WithHTTPClient(&http.Client{Timeout: 2 * time.Second}))
-	require.NoError(t, err)
+	client := newTestClient(t, s.URL)
 
 	board := gofakeit.Animal()
 	text := gofakeit.BuzzWord()
@@ -56,13 +50,15 @@ func TestCreateNewThread(t *testing.T) {
 		DeletePassword: deletePassword,
 	}
 	if rand.Int()%2 == 0 {
+		var err error
 		createResp, err = client.CreateThreadWithFormdataBodyWithResponse(context.Background(), board, createBody)
 		require.NoError(t, err)
 	} else {
+		var err error
 		createResp, err = client.CreateThreadWithResponse(context.Background(), board, createBody)
 		require.NoError(t, err)
 	}
-	assert.Equal(t, createResp.StatusCode(), http.StatusOK)
+	assert.Equal(t, createResp.StatusCode(), http.StatusFound)
 
 	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
 	require.NoError(t, err)
@@ -78,16 +74,10 @@ func TestCreateNewThread(t *testing.T) {
 }
 
 func TestCreateReply(t *testing.T) {
-	msgServ := msgboard.NewService(db)
-	serv := httpserv.NewServer(msgServ)
-	r := chi.NewRouter()
-	strictHandler := api.NewStrictHandler(serv, nil)
-	api.HandlerFromMux(strictHandler, r)
-	s := httptest.NewServer(r)
+	s := newTestServer()
 	defer s.Close()
 
-	client, err := clapi.NewClientWithResponses(s.URL, clapi.WithHTTPClient(&http.Client{Timeout: 2 * time.Second}))
-	require.NoError(t, err)
+	client := newTestClient(t, s.URL)
 
 	board := gofakeit.Animal()
 	threadText := gofakeit.BuzzWord()
@@ -114,9 +104,11 @@ func TestCreateReply(t *testing.T) {
 		ThreadId:       threadID,
 	}
 	if rand.Int()%2 == 0 {
+		var err error
 		createResp, err = client.CreateReplyWithFormdataBodyWithResponse(context.Background(), board, createBody)
 		require.NoError(t, err)
 	} else {
+		var err error
 		createResp, err = client.CreateReplyWithResponse(context.Background(), board, createBody)
 		require.NoError(t, err)
 	}
@@ -154,4 +146,21 @@ func newTestMongoDatabase() *mongo.Database {
 	_, _ = res.Collection(msgboard.RepliesCollection).DeleteMany(context.Background(), bson.D{{}})
 
 	return res
+}
+
+func newTestServer() *httptest.Server {
+	msgServ := msgboard.NewService(db)
+	serv := httpserv.NewServer(msgServ)
+	r := chi.NewRouter()
+	strictHandler := api.NewStrictHandler(serv, nil)
+	api.HandlerFromMux(strictHandler, r)
+	return httptest.NewServer(r)
+}
+
+func newTestClient(t *testing.T, serverURL string) *clapi.ClientWithResponses {
+	client, err := clapi.NewClientWithResponses(serverURL, clapi.WithHTTPClient(&http.Client{
+		Timeout: 2 * time.Second,
+	}))
+	require.NoError(t, err)
+	return client
 }

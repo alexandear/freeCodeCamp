@@ -67,7 +67,7 @@ func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestOb
 		return nil, fmt.Errorf("create msgboard: %w", err)
 	}
 
-	return api.CreateThread200Response{}, nil
+	return api.CreateThread302Response{}, nil
 }
 
 func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObject) (api.CreateReplyResponseObject, error) {

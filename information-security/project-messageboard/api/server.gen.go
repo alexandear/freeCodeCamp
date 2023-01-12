@@ -313,11 +313,11 @@ type CreateThreadResponseObject interface {
 	VisitCreateThreadResponse(w http.ResponseWriter) error
 }
 
-type CreateThread200Response struct {
+type CreateThread302Response struct {
 }
 
-func (response CreateThread200Response) VisitCreateThreadResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
+func (response CreateThread302Response) VisitCreateThreadResponse(w http.ResponseWriter) error {
+	w.WriteHeader(302)
 	return nil
 }
 
