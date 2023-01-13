@@ -56,6 +56,7 @@ type ThreadRes struct {
 	BumpedOn   time.Time
 	IsReported bool
 	Replies    []ReplyRes
+	ReplyCount int
 }
 
 type ReplyRes struct {
@@ -131,6 +132,7 @@ func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (st
 		{"bumped_on", createdOn},
 		{"delete_password", deletePassword},
 		{"is_reported", false},
+		{"reply_count", 0},
 	})
 	if err != nil {
 		return "", fmt.Errorf("insert one: %w", err)
@@ -189,7 +191,10 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 	}
 
 	n := now()
-	update := bson.D{{"$set", bson.D{{"bumped_on", n}}}}
+	update := bson.D{
+		{"$set", bson.D{{"bumped_on", n}}},
+		{"$inc", bson.D{{"reply_count", 1}}},
+	}
 	_, err = s.threads.UpdateByID(ctx, threadObjectID, update)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return "", fmt.Errorf("board not found: %w", err)

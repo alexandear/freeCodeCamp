@@ -16,6 +16,7 @@ type storageThread struct {
 	BumpedOn       time.Time `bson:"bumped_on"`
 	IsReported     bool      `bson:"is_reported"`
 	DeletePassword []byte    `bson:"delete_password"`
+	ReplyCount     int       `bson:"reply_count"`
 }
 
 func (t *storageThread) ToThread(replies []ReplyRes) ThreadRes {
@@ -26,6 +27,7 @@ func (t *storageThread) ToThread(replies []ReplyRes) ThreadRes {
 		BumpedOn:   t.BumpedOn,
 		IsReported: t.IsReported,
 		Replies:    replies,
+		ReplyCount: t.ReplyCount,
 	}
 }
 

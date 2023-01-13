@@ -53,11 +53,12 @@ type ReportThreadBody struct {
 
 // Thread defines model for Thread.
 type Thread struct {
-	Id        string    `json:"_id"`
-	BumpedOn  time.Time `json:"bumped_on"`
-	CreatedOn time.Time `json:"created_on"`
-	Replies   []Reply   `json:"replies"`
-	Text      string    `json:"text"`
+	Id         string    `json:"_id"`
+	BumpedOn   time.Time `json:"bumped_on"`
+	CreatedOn  time.Time `json:"created_on"`
+	Replies    []Reply   `json:"replies"`
+	Replycount int       `json:"replycount"`
+	Text       string    `json:"text"`
 }
 
 // Board defines model for Board.

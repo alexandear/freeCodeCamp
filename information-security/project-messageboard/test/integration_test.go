@@ -69,6 +69,7 @@ func TestCreateNewThread(t *testing.T) {
 	assert.Equal(t, thread.CreatedOn, thread.BumpedOn)
 	assert.Equal(t, text, thread.Text)
 	assert.Len(t, thread.Replies, 0)
+	assert.Equal(t, 0, thread.Replycount)
 }
 
 func TestViewTheMost10RecentThreadsWith3RepliesEach(t *testing.T) {
@@ -233,6 +234,7 @@ func TestCreateNewReply(t *testing.T) {
 	thread := *getResp.JSON200
 	assert.True(t, thread.BumpedOn.After(thread.CreatedOn))
 	assert.Len(t, thread.Replies, 1)
+	assert.Equal(t, 1, thread.Replycount)
 	reply := thread.Replies[0]
 	assert.Equal(t, replyID, reply.Id)
 	assert.Equal(t, replyText, reply.Text)

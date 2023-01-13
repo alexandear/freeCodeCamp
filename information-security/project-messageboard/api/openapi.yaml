@@ -263,6 +263,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Reply"
+        replycount:
+          type: integer
       required:
         - _id
         - text
@@ -270,6 +272,7 @@ components:
         - bumped_on
         - reported
         - replies
+        - replycount
 
   parameters:
     Board:

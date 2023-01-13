@@ -147,10 +147,11 @@ func toAPIThread(thread msgboard.ThreadRes) api.Thread {
 		})
 	}
 	return api.Thread{
-		Id:        thread.ThreadID,
-		BumpedOn:  thread.BumpedOn,
-		CreatedOn: thread.CreatedOn,
-		Replies:   replies,
-		Text:      thread.Text,
+		Id:         thread.ThreadID,
+		BumpedOn:   thread.BumpedOn,
+		CreatedOn:  thread.CreatedOn,
+		Replies:    replies,
+		Text:       thread.Text,
+		Replycount: thread.ReplyCount,
 	}
 }
