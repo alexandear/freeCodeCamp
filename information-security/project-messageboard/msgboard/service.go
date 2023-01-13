@@ -58,7 +58,8 @@ func NewService(db *mongo.Database) *Service {
 }
 
 func (s *Service) Threads(ctx context.Context, board string) ([]ThreadRes, error) {
-	cursor, err := s.threads.Find(ctx, bson.D{{"board", board}}, options.Find().SetLimit(maxReturnedThreadsCount))
+	opts := options.Find().SetLimit(maxReturnedThreadsCount).SetSort(bson.D{{"bumped_on", -1}})
+	cursor, err := s.threads.Find(ctx, bson.D{{"board", board}}, opts)
 	if err != nil {
 		return nil, fmt.Errorf("find: %w", err)
 	}
