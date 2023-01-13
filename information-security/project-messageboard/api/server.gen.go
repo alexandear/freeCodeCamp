@@ -315,11 +315,11 @@ type CreateThreadResponseObject interface {
 	VisitCreateThreadResponse(w http.ResponseWriter) error
 }
 
-type CreateThread302TextResponse string
+type CreateThread200TextResponse string
 
-func (response CreateThread302TextResponse) VisitCreateThreadResponse(w http.ResponseWriter) error {
+func (response CreateThread200TextResponse) VisitCreateThreadResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(302)
+	w.WriteHeader(200)
 
 	_, err := w.Write([]byte(response))
 	return err

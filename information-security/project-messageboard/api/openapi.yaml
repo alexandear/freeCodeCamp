@@ -21,8 +21,8 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateThreadBody"
       responses:
-        302:
-          description: Found
+        200:
+          description: OK
           content:
             text/plain:
               schema:

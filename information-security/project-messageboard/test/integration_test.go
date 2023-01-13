@@ -58,7 +58,7 @@ func TestCreateNewThread(t *testing.T) {
 		createResp, err = client.CreateThreadWithResponse(context.Background(), board, createBody)
 		require.NoError(t, err)
 	}
-	assert.Equal(t, createResp.StatusCode(), http.StatusFound)
+	assert.Equal(t, createResp.StatusCode(), http.StatusOK)
 	threadID := string(createResp.Body)
 	assert.NotEmpty(t, threadID)
 
