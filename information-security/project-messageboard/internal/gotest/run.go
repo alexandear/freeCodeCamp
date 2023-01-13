@@ -51,6 +51,7 @@ func Run(ctx context.Context, dir string, args []string, verbose bool) (*TestRes
 		testName := event.Test
 		result := res.TestResults[testName]
 		result.Output += event.Output
+		result.Assertions = []Assertion{MakeEqualAssertion(), MakePropertyAssertion()} // TODO: replace with real assertions
 		switch event.Action {
 		case actionPass:
 			result.Status = Passed

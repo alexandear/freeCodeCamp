@@ -22,8 +22,9 @@ var knownStatuses = map[status]struct{}{
 
 // TestResult represents single test result (status and output).
 type TestResult struct {
-	Status status
-	Output string
+	Status     status
+	Output     string
+	Assertions []Assertion
 }
 
 func (tr *TestResult) IndentedOutput() string {

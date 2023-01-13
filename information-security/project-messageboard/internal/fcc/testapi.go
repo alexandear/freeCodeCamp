@@ -15,15 +15,17 @@ func FCC(tr *gotest.TestResults) func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			if tr != nil && r.Method == http.MethodGet && r.URL.Path == "/_api/get-tests" {
 				type result struct {
-					Title string `json:"title"`
-					State string `json:"state"`
+					Title      string             `json:"title"`
+					State      string             `json:"state"`
+					Assertions []gotest.Assertion `json:"assertions"`
 				}
 
 				results := make([]result, 0, len(tr.TestResults))
 				for title, res := range tr.TestResults {
 					results = append(results, result{
-						Title: title,
-						State: string(res.Status),
+						Title:      title,
+						State:      string(res.Status),
+						Assertions: res.Assertions,
 					})
 				}
 
