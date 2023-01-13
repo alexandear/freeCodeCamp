@@ -19,14 +19,16 @@ const (
 )
 
 type Service struct {
-	threads *mongo.Collection
-	replies *mongo.Collection
+	dbClient *mongo.Client
+	threads  *mongo.Collection
+	replies  *mongo.Collection
 }
 
 func NewService(db *mongo.Database) *Service {
 	return &Service{
-		threads: db.Collection(ThreadsCollection),
-		replies: db.Collection(RepliesCollection),
+		dbClient: db.Client(),
+		threads:  db.Collection(ThreadsCollection),
+		replies:  db.Collection(RepliesCollection),
 	}
 }
 
@@ -104,20 +106,34 @@ func (s *Service) DeleteThread(ctx context.Context, param DeleteThreadParam) (bo
 	}
 
 	deletePassword := makeHashPassword(param.DeletePassword)
-	res, err := s.threads.DeleteOne(ctx, bson.D{{"_id", threadObjectID}, {"delete_password", deletePassword}})
+
+	trans, err := NewTransaction(ctx, s.dbClient)
 	if err != nil {
-		return false, fmt.Errorf("delete one: %w", err)
+		return false, err
+	}
+	defer trans.Close()
+
+	res, err := trans.Start(func(ctx mongo.SessionContext) (any, error) {
+		res, err := s.threads.DeleteOne(ctx, bson.D{{"_id", threadObjectID}, {"delete_password", deletePassword}})
+		if err != nil {
+			return false, fmt.Errorf("delete one: %w", err)
+		}
+
+		if res.DeletedCount == 0 {
+			return false, nil
+		}
+
+		if _, err := s.replies.DeleteMany(ctx, bson.D{{"thread_id", param.ThreadID}}); err != nil {
+			return false, fmt.Errorf("delete replies: %w", err)
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return false, err
 	}
 
-	if res.DeletedCount == 0 {
-		return false, nil
-	}
-
-	if _, err := s.replies.DeleteMany(ctx, bson.D{{"thread_id", param.ThreadID}}); err != nil {
-		return false, fmt.Errorf("delete replies: %w", err)
-	}
-
-	return true, nil
+	return res.(bool), nil
 }
 
 func (s *Service) ReportThread(ctx context.Context, board, threadID string) error {
@@ -151,30 +167,44 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 		{"$set", bson.D{{"bumped_on", n}}},
 		{"$inc", bson.D{{"reply_count", 1}}},
 	}
-	_, err = s.threads.UpdateByID(ctx, threadObjectID, update)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return "", fmt.Errorf("board not found: %w", err)
-	}
-	if err != nil {
-		return "", fmt.Errorf("find one and update err: %w", err)
-	}
 
-	replyID := primitive.NewObjectID()
-	deletePassword := makeHashPassword(param.DeletePassword)
-	_, err = s.replies.InsertOne(ctx, bson.D{
-		{"_id", replyID},
-		{"thread_id", param.ThreadID},
-		{"board", param.Board},
-		{"text", param.Text},
-		{"created_on", n},
-		{"delete_password", deletePassword},
-		{"is_reported", false},
+	trans, err := NewTransaction(ctx, s.dbClient)
+	if err != nil {
+		return "", err
+	}
+	defer trans.Close()
+
+	res, err := trans.Start(func(ctx mongo.SessionContext) (any, error) {
+		_, err = s.threads.UpdateByID(ctx, threadObjectID, update)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return "", fmt.Errorf("board not found: %w", err)
+		}
+		if err != nil {
+			return "", fmt.Errorf("find one and update err: %w", err)
+		}
+
+		replyID := primitive.NewObjectID()
+		deletePassword := makeHashPassword(param.DeletePassword)
+		_, err = s.replies.InsertOne(ctx, bson.D{
+			{"_id", replyID},
+			{"thread_id", param.ThreadID},
+			{"board", param.Board},
+			{"text", param.Text},
+			{"created_on", n},
+			{"delete_password", deletePassword},
+			{"is_reported", false},
+		})
+		if err != nil {
+			return "", fmt.Errorf("insert one: %w", err)
+		}
+
+		return replyID.Hex(), nil
 	})
 	if err != nil {
-		return "", fmt.Errorf("insert one: %w", err)
+		return "", err
 	}
 
-	return replyID.Hex(), nil
+	return res.(string), nil
 }
 
 func (s *Service) RepliesForThread(ctx context.Context, threadID string, limit int) ([]ReplyRes, error) {
