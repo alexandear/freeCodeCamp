@@ -1,7 +1,6 @@
 package msgboard
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -245,8 +244,4 @@ func makeHashPassword(password string) []byte {
 	sha := sha256.New()
 	sha.Write([]byte(password))
 	return sha.Sum(nil)
-}
-
-func isHashPasswordEqual(hash []byte, password string) bool {
-	return bytes.Equal(hash, makeHashPassword(password))
 }

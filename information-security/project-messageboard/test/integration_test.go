@@ -247,6 +247,14 @@ func TestDeleteReply(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "success", string(deleteReplySuccess.Body))
+
+	getReply, err := client.GetRepliesWithResponse(context.Background(), board, &clapi.GetRepliesParams{ThreadId: threadID})
+	require.NoError(t, err)
+
+	thread := *getReply.JSON200
+	reply := thread.Replies[0]
+	assert.Equal(t, replyID, reply.Id)
+	assert.Equal(t, "[deleted]", reply.Text)
 }
 
 func newTestMongoDatabase() *mongo.Database {
