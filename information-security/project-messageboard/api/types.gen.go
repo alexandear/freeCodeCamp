@@ -22,8 +22,9 @@ type CreateThreadBody struct {
 
 // Reply defines model for Reply.
 type Reply struct {
-	Id   string `json:"_id"`
-	Text string `json:"text"`
+	Id        string    `json:"_id"`
+	CreatedOn time.Time `json:"created_on"`
+	Text      string    `json:"text"`
 }
 
 // Thread defines model for Thread.

@@ -45,9 +45,10 @@ type ThreadRes struct {
 }
 
 type ReplyRes struct {
-	ReplyID  string
-	ThreadID string
-	Text     string
+	ReplyID   string
+	ThreadID  string
+	Text      string
+	CreatedOn time.Time
 }
 
 func NewService(db *mongo.Database) *Service {

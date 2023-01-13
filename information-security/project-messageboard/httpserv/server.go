@@ -87,8 +87,9 @@ func toAPIThread(thread msgboard.ThreadRes) api.Thread {
 	replies := make([]api.Reply, 0, len(thread.Replies))
 	for _, r := range thread.Replies {
 		replies = append(replies, api.Reply{
-			Id:   r.ReplyID,
-			Text: r.Text,
+			Id:        r.ReplyID,
+			Text:      r.Text,
+			CreatedOn: r.CreatedOn,
 		})
 	}
 	return api.Thread{

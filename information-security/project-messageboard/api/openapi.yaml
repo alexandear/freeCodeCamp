@@ -123,9 +123,13 @@ components:
           type: string
         text:
           type: string
+        created_on:
+          type: string
+          format: date-time
       required:
         - _id
         - text
+        - created_on
 
     Thread:
       type: object

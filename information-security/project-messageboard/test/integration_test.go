@@ -115,15 +115,15 @@ func TestCreateReply(t *testing.T) {
 	replyID := string(createResp.Body)
 	assert.NotEmpty(t, replyID)
 
-	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
+	getResp, err := client.GetRepliesWithResponse(context.Background(), board, &clapi.GetRepliesParams{ThreadId: threadID})
 	require.NoError(t, err)
-	require.Len(t, *getResp.JSON200, 1)
-	thread := (*getResp.JSON200)[0]
+	thread := *getResp.JSON200
 	assert.True(t, thread.BumpedOn.After(thread.CreatedOn))
 	assert.Len(t, thread.Replies, 1)
 	reply := thread.Replies[0]
 	assert.Equal(t, replyID, reply.Id)
 	assert.Equal(t, replyText, reply.Text)
+	assert.Equal(t, thread.BumpedOn, reply.CreatedOn)
 }
 
 func TestGetReplies(t *testing.T) {

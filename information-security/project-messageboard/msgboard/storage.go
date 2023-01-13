@@ -29,15 +29,17 @@ func (t *storageThread) ToThread(replies []ReplyRes) ThreadRes {
 }
 
 type storageReply struct {
-	ReplyID  string `bson:"_id"`
-	ThreadID string `bson:"thread_id"`
-	Text     string `bson:"text"`
+	ReplyID   string    `bson:"_id"`
+	ThreadID  string    `bson:"thread_id"`
+	Text      string    `bson:"text"`
+	CreatedOn time.Time `bson:"created_on"`
 }
 
 func (r *storageReply) ToReply() ReplyRes {
 	return ReplyRes{
-		ReplyID:  r.ReplyID,
-		ThreadID: r.ThreadID,
-		Text:     r.Text,
+		ReplyID:   r.ReplyID,
+		ThreadID:  r.ThreadID,
+		Text:      r.Text,
+		CreatedOn: r.CreatedOn,
 	}
 }
