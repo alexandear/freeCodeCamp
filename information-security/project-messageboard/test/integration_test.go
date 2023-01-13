@@ -228,7 +228,7 @@ func TestCreateNewReply(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	assert.Equal(t, http.StatusOK, createResp.StatusCode())
+	assert.Equal(t, http.StatusFound, createResp.StatusCode())
 	replyID := replyIDFromHeader(createResp.HTTPResponse.Header)
 	assert.NotEmpty(t, replyID)
 

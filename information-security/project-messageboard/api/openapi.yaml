@@ -22,12 +22,14 @@ paths:
               $ref: "#/components/schemas/CreateThreadBody"
       responses:
         302:
+          description: Created
           headers:
             Location:
               schema:
                 type: string
         default:
           $ref: "#/components/responses/Default"
+
     get:
       operationId: getThreads
       parameters:
@@ -43,6 +45,7 @@ paths:
                   $ref: "#/components/schemas/Thread"
         default:
           $ref: "#/components/responses/Default"
+
     put:
       operationId: reportThread
       parameters:
@@ -62,6 +65,7 @@ paths:
                 type: string
         default:
           $ref: "#/components/responses/Default"
+
     delete:
       operationId: deleteThread
       parameters:
@@ -98,16 +102,18 @@ paths:
               $ref: "#/components/schemas/CreateReplyBody"
       responses:
         302:
-          description: OK
+          description: Created
           headers:
             Location:
               schema:
                 type: string
             X-Message-Board-Reply-ID:
+              description: For tests
               schema:
                 type: string
         default:
           $ref: "#/components/responses/Default"
+
     get:
       operationId: getReplies
       parameters:
@@ -126,6 +132,7 @@ paths:
                 $ref: "#/components/schemas/Thread"
         default:
           $ref: "#/components/responses/Default"
+
     put:
       operationId: reportReply
       parameters:
@@ -145,6 +152,7 @@ paths:
                 type: string
         default:
           $ref: "#/components/responses/Default"
+
     delete:
       operationId: deleteReply
       parameters:
@@ -177,6 +185,7 @@ components:
       required:
         - text
         - delete_password
+
     DeleteThreadBody:
       type: object
       properties:
@@ -187,6 +196,7 @@ components:
       required:
         - thread_id
         - delete_password
+
     ReportThreadBody:
       type: object
       properties:
@@ -194,6 +204,7 @@ components:
           type: string
       required:
         - thread_id
+
     CreateReplyBody:
       type: object
       properties:
@@ -207,6 +218,7 @@ components:
         - text
         - delete_password
         - thread_id
+
     ReportReplyBody:
       type: object
       properties:
@@ -217,6 +229,7 @@ components:
       required:
         - thread_id
         - reply_id
+
     DeleteReplyBody:
       type: object
       properties:

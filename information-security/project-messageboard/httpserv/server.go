@@ -76,16 +76,18 @@ func (s *Server) DeleteThread(ctx context.Context, req api.DeleteThreadRequestOb
 		return nil, fmt.Errorf("delete thread: %w", err)
 	}
 
-	if ifDeleted {
-		return api.DeleteThread200TextResponse(DeleteRespSuccess), nil
+	respText := DeleteRespSuccess
+	if !ifDeleted {
+		respText = DeleteRespIncorrectPassword
 	}
-	return api.DeleteThread200TextResponse(DeleteRespIncorrectPassword), nil
+	return api.DeleteThread200TextResponse(respText), nil
 }
 
 func (s *Server) ReportThread(ctx context.Context, req api.ReportThreadRequestObject) (api.ReportThreadResponseObject, error) {
 	if err := s.msgServ.ReportThread(ctx, req.Board, req.Body.ThreadId); err != nil {
 		return nil, fmt.Errorf("report thread: %w", err)
 	}
+
 	return api.ReportThread200TextResponse(ReportRespSuccess), nil
 }
 
@@ -94,6 +96,7 @@ func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObje
 	if req.FormdataBody != nil {
 		body = req.FormdataBody
 	}
+
 	replyID, err := s.msgServ.CreateReply(ctx, msgboard.CreateReplyParam{
 		ThreadID:       body.ThreadId,
 		Board:          req.Board,
@@ -123,15 +126,16 @@ func (s *Server) DeleteReply(ctx context.Context, req api.DeleteReplyRequestObje
 		return nil, fmt.Errorf("delete reply: %w", err)
 	}
 
-	if ifDeleted {
-		return api.DeleteReply200TextResponse(DeleteRespSuccess), nil
+	respText := DeleteRespSuccess
+	if !ifDeleted {
+		respText = DeleteRespIncorrectPassword
 	}
-	return api.DeleteReply200TextResponse(DeleteRespIncorrectPassword), nil
+
+	return api.DeleteReply200TextResponse(respText), nil
 }
 
 func (s *Server) GetReplies(ctx context.Context, req api.GetRepliesRequestObject) (api.GetRepliesResponseObject, error) {
-	threadID := req.Params.ThreadId
-	thread, err := s.msgServ.Thread(ctx, req.Board, threadID)
+	thread, err := s.msgServ.Thread(ctx, req.Board, req.Params.ThreadId)
 	if err != nil {
 		return nil, fmt.Errorf("thread: %w", err)
 	}
@@ -143,6 +147,7 @@ func (s *Server) ReportReply(ctx context.Context, req api.ReportReplyRequestObje
 	if err := s.msgServ.ReportReply(ctx, req.Board, req.Body.ThreadId, req.Body.ReplyId); err != nil {
 		return nil, fmt.Errorf("report reply: %w", err)
 	}
+
 	return api.ReportReply200TextResponse(ReportRespSuccess), nil
 }
 
@@ -155,6 +160,7 @@ func toAPIThread(thread msgboard.ThreadRes) api.Thread {
 			CreatedOn: r.CreatedOn,
 		})
 	}
+
 	return api.Thread{
 		Id:         thread.ThreadID,
 		BumpedOn:   thread.BumpedOn,
