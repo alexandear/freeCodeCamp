@@ -38,12 +38,11 @@ func TestCreateNewThread(t *testing.T) {
 
 	board := gofakeit.Animal()
 	text := gofakeit.BuzzWord()
-	deletePassword := gofakeit.NounAbstract()
 
 	var createResp *clapi.CreateThreadResponse
 	createBody := clapi.CreateThreadJSONRequestBody{
 		Text:           text,
-		DeletePassword: deletePassword,
+		DeletePassword: gofakeit.NounAbstract(),
 	}
 	if rand.Int()%2 == 0 {
 		var err error
@@ -54,7 +53,7 @@ func TestCreateNewThread(t *testing.T) {
 		createResp, err = client.CreateThreadWithResponse(context.Background(), board, createBody)
 		require.NoError(t, err)
 	}
-	assert.Equal(t, createResp.StatusCode(), http.StatusOK)
+	assert.Equal(t, http.StatusOK, createResp.StatusCode())
 	threadID := string(createResp.Body)
 	assert.NotEmpty(t, threadID)
 
@@ -102,6 +101,8 @@ func TestViewTheMost10RecentThreadsWith3RepliesEach(t *testing.T) {
 	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
 	require.NoError(t, err)
 
+	assert.Equal(t, http.StatusOK, getResp.StatusCode())
+
 	threads := *getResp.JSON200
 	assert.Len(t, threads, 10)
 	for _, thread := range threads {
@@ -116,12 +117,10 @@ func TestDeleteThreadWithIncorrectPassword(t *testing.T) {
 	client := newTestClient(t, s.URL)
 
 	board := gofakeit.Animal()
-	text := gofakeit.BuzzWord()
-	deletePassword := gofakeit.NounAbstract()
 
 	createResp, err := client.CreateThreadWithResponse(context.Background(), board, clapi.CreateThreadJSONRequestBody{
-		Text:           text,
-		DeletePassword: deletePassword,
+		Text:           gofakeit.BuzzWord(),
+		DeletePassword: gofakeit.NounAbstract(),
 	})
 	require.NoError(t, err)
 
@@ -133,6 +132,7 @@ func TestDeleteThreadWithIncorrectPassword(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	assert.Equal(t, http.StatusOK, deleteResp.StatusCode())
 	assert.Equal(t, "incorrect password", string(deleteResp.Body))
 }
 
@@ -143,11 +143,10 @@ func TestDeleteThreadWithCorrectPassword(t *testing.T) {
 	client := newTestClient(t, s.URL)
 
 	board := gofakeit.Animal()
-	text := gofakeit.BuzzWord()
 	deletePassword := gofakeit.NounAbstract()
 
 	createResp, err := client.CreateThreadWithResponse(context.Background(), board, clapi.CreateThreadJSONRequestBody{
-		Text:           text,
+		Text:           gofakeit.BuzzWord(),
 		DeletePassword: deletePassword,
 	})
 	require.NoError(t, err)
@@ -160,6 +159,7 @@ func TestDeleteThreadWithCorrectPassword(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	assert.Equal(t, http.StatusOK, deleteResp.StatusCode())
 	assert.Equal(t, "success", string(deleteResp.Body))
 }
 
@@ -186,6 +186,7 @@ func TestReportThread(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	assert.Equal(t, http.StatusOK, reportResp.StatusCode())
 	assert.Equal(t, "reported", string(reportResp.Body))
 }
 
@@ -225,7 +226,7 @@ func TestCreateNewReply(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	assert.Equal(t, createResp.StatusCode(), http.StatusOK)
+	assert.Equal(t, http.StatusOK, createResp.StatusCode())
 	replyID := string(createResp.Body)
 	assert.NotEmpty(t, replyID)
 
@@ -273,6 +274,7 @@ func TestViewThreadWithAllReplies(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	assert.Equal(t, http.StatusOK, getResp.StatusCode())
 	thread := getResp.JSON200
 	assert.Equal(t, threadText, thread.Text)
 	assert.Len(t, thread.Replies, 5)
@@ -285,12 +287,11 @@ func TestDeleteReplyWithIncorrectPassword(t *testing.T) {
 	client := newTestClient(t, s.URL)
 
 	board := gofakeit.Animal()
-	threadText := gofakeit.BuzzWord()
 
 	threadID := func() string {
 		resp, err := client.CreateThreadWithResponse(context.Background(), board, clapi.CreateThreadBody{
 			DeletePassword: gofakeit.NounAbstract(),
-			Text:           threadText,
+			Text:           gofakeit.BuzzWord(),
 		})
 		require.NoError(t, err)
 		return string(resp.Body)
@@ -316,8 +317,8 @@ func TestDeleteReplyWithIncorrectPassword(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	assert.Equal(t, http.StatusOK, deleteReply.StatusCode())
 	assert.Equal(t, "incorrect password", string(deleteReply.Body))
-
 }
 
 func TestDeleteReplyWithCorrectPassword(t *testing.T) {
@@ -358,6 +359,7 @@ func TestDeleteReplyWithCorrectPassword(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	assert.Equal(t, http.StatusOK, deleteReply.StatusCode())
 	assert.Equal(t, "success", string(deleteReply.Body))
 
 	getReply, err := client.GetRepliesWithResponse(context.Background(), board, &clapi.GetRepliesParams{ThreadId: threadID})
@@ -406,6 +408,7 @@ func TestReportReply(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	assert.Equal(t, http.StatusOK, reportResp.StatusCode())
 	assert.Equal(t, "reported", string(reportResp.Body))
 }
 
