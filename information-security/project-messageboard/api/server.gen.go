@@ -21,7 +21,7 @@ type ServerInterface interface {
 	CreateReply(w http.ResponseWriter, r *http.Request, board Board)
 
 	// (GET /api/threads/{board})
-	GetThreads(w http.ResponseWriter, r *http.Request, board Board)
+	GetThreads(w http.ResponseWriter, r *http.Request, board Board, params GetThreadsParams)
 
 	// (POST /api/threads/{board})
 	CreateThread(w http.ResponseWriter, r *http.Request, board Board)
@@ -77,8 +77,19 @@ func (siw *ServerInterfaceWrapper) GetThreads(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetThreadsParams
+
+	// ------------- Optional query parameter "thread_id" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "thread_id", r.URL.Query(), &params.ThreadId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetThreads(w, r, board)
+		siw.Handler.GetThreads(w, r, board, params)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -276,7 +287,8 @@ func (response CreateReplydefaultTextResponse) VisitCreateReplyResponse(w http.R
 }
 
 type GetThreadsRequestObject struct {
-	Board Board `json:"board"`
+	Board  Board `json:"board"`
+	Params GetThreadsParams
 }
 
 type GetThreadsResponseObject interface {
@@ -428,10 +440,11 @@ func (sh *strictHandler) CreateReply(w http.ResponseWriter, r *http.Request, boa
 }
 
 // GetThreads operation middleware
-func (sh *strictHandler) GetThreads(w http.ResponseWriter, r *http.Request, board Board) {
+func (sh *strictHandler) GetThreads(w http.ResponseWriter, r *http.Request, board Board, params GetThreadsParams) {
 	var request GetThreadsRequestObject
 
 	request.Board = board
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.GetThreads(ctx, request.(GetThreadsRequestObject))

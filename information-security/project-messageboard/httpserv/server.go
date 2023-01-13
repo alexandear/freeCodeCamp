@@ -24,29 +24,26 @@ func NewServer(msgServ *msgboard.Service) *Server {
 }
 
 func (s *Server) GetThreads(ctx context.Context, req api.GetThreadsRequestObject) (api.GetThreadsResponseObject, error) {
+	threadID := req.Params.ThreadId
+	if threadID != nil {
+		thread, err := s.msgServ.Thread(ctx, req.Board, *threadID)
+		if err != nil {
+			return nil, fmt.Errorf("thread: %w", err)
+		}
+
+		return api.GetThreads200JSONResponse{
+			toAPIThread(thread),
+		}, nil
+	}
+
 	threads, err := s.msgServ.Threads(ctx, req.Board)
 	if err != nil {
 		return nil, fmt.Errorf("get msgboard: %w", err)
 	}
 
 	res := make(api.GetThreads200JSONResponse, 0, len(threads))
-	for _, th := range threads {
-		resThread := api.Thread{
-			Id:        th.ThreadID,
-			BumpedOn:  th.BumpedOn,
-			CreatedOn: th.CreatedOn,
-			Text:      th.Text,
-			Replies:   []api.Reply{},
-		}
-
-		for _, r := range th.Replies {
-			resThread.Replies = append(resThread.Replies, api.Reply{
-				Id:   r.ReplyID,
-				Text: r.Text,
-			})
-		}
-
-		res = append(res, resThread)
+	for _, thread := range threads {
+		res = append(res, toAPIThread(thread))
 	}
 
 	return res, nil
@@ -86,4 +83,21 @@ func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObje
 	}
 
 	return api.CreateReply200TextResponse(replyID), nil
+}
+
+func toAPIThread(thread msgboard.ThreadRes) api.Thread {
+	replies := make([]api.Reply, 0, len(thread.Replies))
+	for _, r := range thread.Replies {
+		replies = append(replies, api.Reply{
+			Id:   r.ReplyID,
+			Text: r.Text,
+		})
+	}
+	return api.Thread{
+		Id:        thread.ThreadID,
+		BumpedOn:  thread.BumpedOn,
+		CreatedOn: thread.CreatedOn,
+		Replies:   replies,
+		Text:      thread.Text,
+	}
 }

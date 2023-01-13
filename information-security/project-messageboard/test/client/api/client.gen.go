@@ -48,6 +48,11 @@ type Thread struct {
 // Board defines model for Board.
 type Board = string
 
+// GetThreadsParams defines parameters for GetThreads.
+type GetThreadsParams struct {
+	ThreadId *string `form:"thread_id,omitempty" json:"thread_id,omitempty"`
+}
+
 // CreateReplyJSONRequestBody defines body for CreateReply for application/json ContentType.
 type CreateReplyJSONRequestBody = CreateReplyBody
 
@@ -141,7 +146,7 @@ type ClientInterface interface {
 	CreateReplyWithFormdataBody(ctx context.Context, board Board, body CreateReplyFormdataRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetThreads request
-	GetThreads(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetThreads(ctx context.Context, board Board, params *GetThreadsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateThread request with any body
 	CreateThreadWithBody(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -187,8 +192,8 @@ func (c *Client) CreateReplyWithFormdataBody(ctx context.Context, board Board, b
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetThreads(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetThreadsRequest(c.Server, board)
+func (c *Client) GetThreads(ctx context.Context, board Board, params *GetThreadsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetThreadsRequest(c.Server, board, params)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +299,7 @@ func NewCreateReplyRequestWithBody(server string, board Board, contentType strin
 }
 
 // NewGetThreadsRequest generates requests for GetThreads
-func NewGetThreadsRequest(server string, board Board) (*http.Request, error) {
+func NewGetThreadsRequest(server string, board Board, params *GetThreadsParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -318,6 +323,26 @@ func NewGetThreadsRequest(server string, board Board) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	queryValues := queryURL.Query()
+
+	if params.ThreadId != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "thread_id", runtime.ParamLocationQuery, *params.ThreadId); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -436,7 +461,7 @@ type ClientWithResponsesInterface interface {
 	CreateReplyWithFormdataBodyWithResponse(ctx context.Context, board Board, body CreateReplyFormdataRequestBody, reqEditors ...RequestEditorFn) (*CreateReplyResponse, error)
 
 	// GetThreads request
-	GetThreadsWithResponse(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error)
+	GetThreadsWithResponse(ctx context.Context, board Board, params *GetThreadsParams, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error)
 
 	// CreateThread request with any body
 	CreateThreadWithBodyWithResponse(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateThreadResponse, error)
@@ -536,8 +561,8 @@ func (c *ClientWithResponses) CreateReplyWithFormdataBodyWithResponse(ctx contex
 }
 
 // GetThreadsWithResponse request returning *GetThreadsResponse
-func (c *ClientWithResponses) GetThreadsWithResponse(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error) {
-	rsp, err := c.GetThreads(ctx, board, reqEditors...)
+func (c *ClientWithResponses) GetThreadsWithResponse(ctx context.Context, board Board, params *GetThreadsParams, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error) {
+	rsp, err := c.GetThreads(ctx, board, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

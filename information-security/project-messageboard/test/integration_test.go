@@ -62,7 +62,7 @@ func TestCreateNewThread(t *testing.T) {
 	threadID := string(createResp.Body)
 	assert.NotEmpty(t, threadID)
 
-	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
+	getResp, err := client.GetThreadsWithResponse(context.Background(), board, &clapi.GetThreadsParams{})
 	require.NoError(t, err)
 
 	threads := *getResp.JSON200
@@ -115,7 +115,7 @@ func TestCreateReply(t *testing.T) {
 	replyID := string(createResp.Body)
 	assert.NotEmpty(t, replyID)
 
-	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
+	getResp, err := client.GetThreadsWithResponse(context.Background(), board, &clapi.GetThreadsParams{})
 	require.NoError(t, err)
 	require.Len(t, *getResp.JSON200, 1)
 	thread := (*getResp.JSON200)[0]
@@ -124,6 +124,44 @@ func TestCreateReply(t *testing.T) {
 	reply := thread.Replies[0]
 	assert.Equal(t, replyID, reply.Id)
 	assert.Equal(t, replyText, reply.Text)
+}
+
+func TestGetThread(t *testing.T) {
+	s := newTestServer()
+	defer s.Close()
+
+	client := newTestClient(t, s.URL)
+
+	board := gofakeit.Animal()
+	threadText := gofakeit.BuzzWord()
+
+	threadID := func() string {
+		resp, err := client.CreateThreadWithResponse(context.Background(), board, clapi.CreateThreadBody{
+			DeletePassword: gofakeit.NounAbstract(),
+			Text:           threadText,
+		})
+		require.NoError(t, err)
+		return string(resp.Body)
+	}()
+
+	for i := 0; i < 5; i++ {
+		_, err := client.CreateReplyWithResponse(context.Background(), board, clapi.CreateReplyBody{
+			DeletePassword: gofakeit.NounAbstract(),
+			Text:           gofakeit.BuzzWord(),
+			ThreadId:       threadID,
+		})
+		require.NoError(t, err)
+	}
+
+	getResp, err := client.GetThreadsWithResponse(context.Background(), board, &clapi.GetThreadsParams{
+		ThreadId: &threadID,
+	})
+	require.NoError(t, err)
+
+	require.Len(t, *getResp.JSON200, 1)
+	thread := (*getResp.JSON200)[0]
+	assert.Equal(t, threadText, thread.Text)
+	assert.Len(t, thread.Replies, 5)
 }
 
 func newTestMongoDatabase() *mongo.Database {

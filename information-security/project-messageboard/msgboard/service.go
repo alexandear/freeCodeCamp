@@ -71,7 +71,7 @@ func (s *Service) Threads(ctx context.Context, board string) ([]ThreadRes, error
 
 	threads := make([]ThreadRes, 0, len(dbThreads))
 	for _, dbThread := range dbThreads {
-		replies, err := s.RepliesForThread(ctx, dbThread.ThreadID)
+		replies, err := s.RepliesForThread(ctx, dbThread.ThreadID, maxReturnedRepliesCount)
 		if err != nil {
 			return nil, fmt.Errorf("replies for msgboard=%s: %w", dbThread.ThreadID, err)
 		}
@@ -80,6 +80,26 @@ func (s *Service) Threads(ctx context.Context, board string) ([]ThreadRes, error
 	}
 
 	return threads, nil
+}
+
+func (s *Service) Thread(ctx context.Context, board, threadID string) (ThreadRes, error) {
+	threadObjID, err := primitive.ObjectIDFromHex(threadID)
+	if err != nil {
+		return ThreadRes{}, fmt.Errorf("object id from hex: %w", err)
+	}
+
+	var dbThread storageThread
+	err = s.threads.FindOne(ctx, bson.D{{"board", board}, {"_id", threadObjID}}).Decode(&dbThread)
+	if err != nil {
+		return ThreadRes{}, fmt.Errorf("find one thread: %w", err)
+	}
+
+	replies, err := s.RepliesForThread(ctx, threadID, 0)
+	if err != nil {
+		return ThreadRes{}, fmt.Errorf("find replies: %w", err)
+	}
+
+	return dbThread.ToThread(replies), nil
 }
 
 func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (string, error) {
@@ -133,13 +153,13 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 	return replyID.Hex(), nil
 }
 
-func (s *Service) RepliesForThread(ctx context.Context, threadID string) ([]ReplyRes, error) {
-	cursor, err := s.replies.Find(ctx, bson.D{{"thread_id", threadID}}, options.Find().SetLimit(maxReturnedRepliesCount))
+func (s *Service) RepliesForThread(ctx context.Context, threadID string, limit int) ([]ReplyRes, error) {
+	cursor, err := s.replies.Find(ctx, bson.D{{"thread_id", threadID}}, options.Find().SetLimit(int64(limit)))
 	if err != nil {
 		return nil, fmt.Errorf("find: %w", err)
 	}
 
-	dbReplies := make([]storageReply, 0, maxReturnedRepliesCount)
+	dbReplies := make([]storageReply, 0, limit)
 	if err := cursor.All(ctx, &dbReplies); err != nil {
 		return nil, fmt.Errorf("cursor all: %w", err)
 	}

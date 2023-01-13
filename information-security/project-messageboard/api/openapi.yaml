@@ -34,6 +34,12 @@ paths:
       operationId: getThreads
       parameters:
         - $ref: "#/components/parameters/Board"
+        - in: query
+          name: thread_id
+          schema:
+            type: string
+          required: false
+
       responses:
         200:
           description: OK
