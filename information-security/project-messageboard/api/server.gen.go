@@ -493,14 +493,20 @@ type CreateReplyResponseObject interface {
 	VisitCreateReplyResponse(w http.ResponseWriter) error
 }
 
-type CreateReply200TextResponse string
+type CreateReply302ResponseHeaders struct {
+	Location             string
+	XMessageBoardReplyID string
+}
 
-func (response CreateReply200TextResponse) VisitCreateReplyResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(200)
+type CreateReply302Response struct {
+	Headers CreateReply302ResponseHeaders
+}
 
-	_, err := w.Write([]byte(response))
-	return err
+func (response CreateReply302Response) VisitCreateReplyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("X-Message-Board-Reply-ID", fmt.Sprint(response.Headers.XMessageBoardReplyID))
+	w.WriteHeader(302)
+	return nil
 }
 
 type CreateReplydefaultTextResponse struct {
@@ -620,14 +626,18 @@ type CreateThreadResponseObject interface {
 	VisitCreateThreadResponse(w http.ResponseWriter) error
 }
 
-type CreateThread200TextResponse string
+type CreateThread302ResponseHeaders struct {
+	Location string
+}
 
-func (response CreateThread200TextResponse) VisitCreateThreadResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(200)
+type CreateThread302Response struct {
+	Headers CreateThread302ResponseHeaders
+}
 
-	_, err := w.Write([]byte(response))
-	return err
+func (response CreateThread302Response) VisitCreateThreadResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.WriteHeader(302)
+	return nil
 }
 
 type CreateThreaddefaultTextResponse struct {

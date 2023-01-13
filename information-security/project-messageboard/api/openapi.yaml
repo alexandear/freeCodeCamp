@@ -21,12 +21,10 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateThreadBody"
       responses:
-        200:
-          description: OK
-          content:
-            text/plain:
+        302:
+          headers:
+            Location:
               schema:
-                description: Thread ID
                 type: string
         default:
           $ref: "#/components/responses/Default"
@@ -99,12 +97,14 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateReplyBody"
       responses:
-        200:
+        302:
           description: OK
-          content:
-            text/plain:
+          headers:
+            Location:
               schema:
-                description: Reply ID
+                type: string
+            X-Message-Board-Reply-ID:
+              schema:
                 type: string
         default:
           $ref: "#/components/responses/Default"

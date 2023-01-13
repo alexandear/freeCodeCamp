@@ -62,7 +62,7 @@ func ExecServer() {
 	r.Get("/b/{board}/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "views/board.html")
 	})
-	r.Get("/b/{board}{threadId}", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/b/{board}/{threadId}", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "views/thread.html")
 	})
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {

@@ -59,7 +59,11 @@ func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestOb
 		return nil, fmt.Errorf("create msgboard: %w", err)
 	}
 
-	return api.CreateThread200TextResponse(threadID), nil
+	return api.CreateThread302Response{
+		Headers: api.CreateThread302ResponseHeaders{
+			Location: locationHeader(req.Board, threadID),
+		},
+	}, nil
 }
 
 func (s *Server) DeleteThread(ctx context.Context, req api.DeleteThreadRequestObject) (api.DeleteThreadResponseObject, error) {
@@ -100,7 +104,12 @@ func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObje
 		return nil, fmt.Errorf("create reply: %w", err)
 	}
 
-	return api.CreateReply200TextResponse(replyID), nil
+	return api.CreateReply302Response{
+		Headers: api.CreateReply302ResponseHeaders{
+			Location:             locationHeader(req.Board, body.ThreadId),
+			XMessageBoardReplyID: replyID,
+		},
+	}, nil
 }
 
 func (s *Server) DeleteReply(ctx context.Context, req api.DeleteReplyRequestObject) (api.DeleteReplyResponseObject, error) {
@@ -154,4 +163,8 @@ func toAPIThread(thread msgboard.ThreadRes) api.Thread {
 		Text:       thread.Text,
 		Replycount: thread.ReplyCount,
 	}
+}
+
+func locationHeader(board, threadID string) string {
+	return "/b/" + board + "/" + threadID
 }

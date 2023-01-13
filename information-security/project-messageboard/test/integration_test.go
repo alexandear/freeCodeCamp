@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,8 +54,9 @@ func TestCreateNewThread(t *testing.T) {
 		createResp, err = client.CreateThreadWithResponse(context.Background(), board, createBody)
 		require.NoError(t, err)
 	}
-	assert.Equal(t, http.StatusOK, createResp.StatusCode())
-	threadID := string(createResp.Body)
+	assert.Equal(t, http.StatusFound, createResp.StatusCode())
+
+	threadID := threadIDFromHeader(createResp.HTTPResponse.Header)
 	assert.NotEmpty(t, threadID)
 
 	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
@@ -86,7 +88,7 @@ func TestViewTheMost10RecentThreadsWith3RepliesEach(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		threadID := string(resp.Body)
+		threadID := threadIDFromHeader(resp.HTTPResponse.Header)
 
 		for reply := 0; reply < 5; reply++ {
 			_, err = client.CreateReplyWithResponse(context.Background(), board, clapi.CreateReplyBody{
@@ -124,7 +126,7 @@ func TestDeleteThreadWithIncorrectPassword(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	threadID := string(createResp.Body)
+	threadID := threadIDFromHeader(createResp.HTTPResponse.Header)
 
 	deleteResp, err := client.DeleteThreadWithResponse(context.Background(), board, clapi.DeleteThreadJSONRequestBody{
 		DeletePassword: "wrong password",
@@ -151,7 +153,7 @@ func TestDeleteThreadWithCorrectPassword(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	threadID := string(createResp.Body)
+	threadID := threadIDFromHeader(createResp.HTTPResponse.Header)
 
 	deleteResp, err := client.DeleteThreadWithResponse(context.Background(), board, clapi.DeleteThreadJSONRequestBody{
 		DeletePassword: deletePassword,
@@ -179,7 +181,7 @@ func TestReportThread(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	threadID := string(createResp.Body)
+	threadID := threadIDFromHeader(createResp.HTTPResponse.Header)
 
 	reportResp, err := client.ReportThreadWithResponse(context.Background(), board, clapi.ReportThreadBody{
 		ThreadId: threadID,
@@ -205,7 +207,7 @@ func TestCreateNewReply(t *testing.T) {
 			Text:           threadText,
 		})
 		require.NoError(t, err)
-		return string(resp.Body)
+		return threadIDFromHeader(resp.HTTPResponse.Header)
 	}()
 
 	replyText := gofakeit.BuzzWord()
@@ -227,7 +229,7 @@ func TestCreateNewReply(t *testing.T) {
 	}
 
 	assert.Equal(t, http.StatusOK, createResp.StatusCode())
-	replyID := string(createResp.Body)
+	replyID := replyIDFromHeader(createResp.HTTPResponse.Header)
 	assert.NotEmpty(t, replyID)
 
 	getResp, err := client.GetRepliesWithResponse(context.Background(), board, &clapi.GetRepliesParams{ThreadId: threadID})
@@ -257,7 +259,7 @@ func TestViewThreadWithAllReplies(t *testing.T) {
 			Text:           threadText,
 		})
 		require.NoError(t, err)
-		return string(resp.Body)
+		return threadIDFromHeader(resp.HTTPResponse.Header)
 	}()
 
 	for i := 0; i < 5; i++ {
@@ -294,7 +296,7 @@ func TestDeleteReplyWithIncorrectPassword(t *testing.T) {
 			Text:           gofakeit.BuzzWord(),
 		})
 		require.NoError(t, err)
-		return string(resp.Body)
+		return threadIDFromHeader(resp.HTTPResponse.Header)
 	}()
 
 	replyText := gofakeit.BuzzWord()
@@ -308,7 +310,7 @@ func TestDeleteReplyWithIncorrectPassword(t *testing.T) {
 	createResp, err := client.CreateReplyWithResponse(context.Background(), board, createBody)
 	require.NoError(t, err)
 
-	replyID := string(createResp.Body)
+	replyID := replyIDFromHeader(createResp.HTTPResponse.Header)
 
 	deleteReply, err := client.DeleteReplyWithResponse(context.Background(), board, clapi.DeleteReplyBody{
 		DeletePassword: "incorrect password",
@@ -336,7 +338,7 @@ func TestDeleteReplyWithCorrectPassword(t *testing.T) {
 			Text:           threadText,
 		})
 		require.NoError(t, err)
-		return string(resp.Body)
+		return threadIDFromHeader(resp.HTTPResponse.Header)
 	}()
 
 	replyText := gofakeit.BuzzWord()
@@ -350,7 +352,7 @@ func TestDeleteReplyWithCorrectPassword(t *testing.T) {
 	createResp, err := client.CreateReplyWithResponse(context.Background(), board, createBody)
 	require.NoError(t, err)
 
-	replyID := string(createResp.Body)
+	replyID := replyIDFromHeader(createResp.HTTPResponse.Header)
 
 	deleteReply, err := client.DeleteReplyWithResponse(context.Background(), board, clapi.DeleteReplyBody{
 		DeletePassword: deletePassword,
@@ -386,7 +388,7 @@ func TestReportReply(t *testing.T) {
 			Text:           threadText,
 		})
 		require.NoError(t, err)
-		return string(resp.Body)
+		return threadIDFromHeader(resp.HTTPResponse.Header)
 	}()
 
 	replyText := gofakeit.BuzzWord()
@@ -400,7 +402,7 @@ func TestReportReply(t *testing.T) {
 	createResp, err := client.CreateReplyWithResponse(context.Background(), board, createBody)
 	require.NoError(t, err)
 
-	replyID := string(createResp.Body)
+	replyID := replyIDFromHeader(createResp.HTTPResponse.Header)
 
 	reportResp, err := client.ReportReplyWithResponse(context.Background(), board, clapi.ReportReplyBody{
 		ReplyId:  replyID,
@@ -447,7 +449,23 @@ func newTestServer() *httptest.Server {
 func newTestClient(t *testing.T, serverURL string) *clapi.ClientWithResponses {
 	client, err := clapi.NewClientWithResponses(serverURL, clapi.WithHTTPClient(&http.Client{
 		Timeout: 2 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}))
 	require.NoError(t, err)
 	return client
+}
+
+func threadIDFromHeader(r http.Header) string {
+	loc := r.Get("Location")
+	paths := strings.Split(loc, "/")
+	if len(paths) != 4 {
+		return ""
+	}
+	return paths[3]
+}
+
+func replyIDFromHeader(r http.Header) string {
+	return r.Get("X-Message-Board-Reply-ID")
 }
