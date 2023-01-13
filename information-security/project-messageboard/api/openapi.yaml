@@ -126,6 +126,25 @@ paths:
                 $ref: "#/components/schemas/Thread"
         default:
           $ref: "#/components/responses/Default"
+    put:
+      operationId: reportReply
+      parameters:
+        - $ref: "#/components/parameters/Board"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportReplyBody"
+      responses:
+        200:
+          description: Returns 'reported'
+          content:
+            text/plain:
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Default"
     delete:
       operationId: deleteReply
       parameters:
@@ -188,6 +207,16 @@ components:
         - text
         - delete_password
         - thread_id
+    ReportReplyBody:
+      type: object
+      properties:
+        thread_id:
+          type: string
+        reply_id:
+          type: string
+      required:
+        - thread_id
+        - reply_id
     DeleteReplyBody:
       type: object
       properties:

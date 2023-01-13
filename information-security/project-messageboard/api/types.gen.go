@@ -40,6 +40,12 @@ type Reply struct {
 	Text      string    `json:"text"`
 }
 
+// ReportReplyBody defines model for ReportReplyBody.
+type ReportReplyBody struct {
+	ReplyId  string `json:"reply_id"`
+	ThreadId string `json:"thread_id"`
+}
+
 // ReportThreadBody defines model for ReportThreadBody.
 type ReportThreadBody struct {
 	ThreadId string `json:"thread_id"`
@@ -70,6 +76,9 @@ type CreateReplyJSONRequestBody = CreateReplyBody
 
 // CreateReplyFormdataRequestBody defines body for CreateReply for application/x-www-form-urlencoded ContentType.
 type CreateReplyFormdataRequestBody = CreateReplyBody
+
+// ReportReplyJSONRequestBody defines body for ReportReply for application/json ContentType.
+type ReportReplyJSONRequestBody = ReportReplyBody
 
 // DeleteThreadJSONRequestBody defines body for DeleteThread for application/json ContentType.
 type DeleteThreadJSONRequestBody = DeleteThreadBody

@@ -207,6 +207,7 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 		{"text", param.Text},
 		{"created_on", n},
 		{"delete_password", deletePassword},
+		{"is_reported", false},
 	})
 	if err != nil {
 		return "", fmt.Errorf("insert one: %w", err)
@@ -256,6 +257,28 @@ func (s *Service) DeleteReply(ctx context.Context, param DeleteReplyParam) (bool
 	}
 
 	return true, nil
+}
+
+func (s *Service) ReportReply(ctx context.Context, board, threadID, replyID string) error {
+	replyObjectID, err := primitive.ObjectIDFromHex(replyID)
+	if err != nil {
+		return fmt.Errorf("wrong object id: %w", err)
+	}
+
+	res, err := s.replies.UpdateOne(ctx, bson.D{
+		{"_id", replyObjectID},
+		{"thread_id", threadID},
+		{"board", board},
+	}, bson.D{{"$set", bson.D{{"is_reported", true}}}})
+	if err != nil {
+		return fmt.Errorf("update one: %w", err)
+	}
+
+	if res.ModifiedCount != 1 {
+		return fmt.Errorf("reply not found")
+	}
+
+	return nil
 }
 
 func now() time.Time {

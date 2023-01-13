@@ -36,6 +36,7 @@ type storageReply struct {
 	Text           string    `bson:"text"`
 	CreatedOn      time.Time `bson:"created_on"`
 	DeletePassword []byte    `bson:"delete_password"`
+	IsReported     bool      `bson:"is_reported"`
 }
 
 func (r *storageReply) ToReply() ReplyRes {

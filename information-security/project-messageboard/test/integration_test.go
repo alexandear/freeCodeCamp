@@ -225,6 +225,46 @@ func TestGetReplies(t *testing.T) {
 	assert.Len(t, thread.Replies, 5)
 }
 
+func TestReportReply(t *testing.T) {
+	s := newTestServer()
+	defer s.Close()
+
+	client := newTestClient(t, s.URL)
+
+	board := gofakeit.Animal()
+	threadText := gofakeit.BuzzWord()
+
+	threadID := func() string {
+		resp, err := client.CreateThreadWithResponse(context.Background(), board, clapi.CreateThreadBody{
+			DeletePassword: gofakeit.NounAbstract(),
+			Text:           threadText,
+		})
+		require.NoError(t, err)
+		return string(resp.Body)
+	}()
+
+	replyText := gofakeit.BuzzWord()
+
+	deletePassword := gofakeit.NounAbstract()
+	createBody := clapi.CreateReplyBody{
+		DeletePassword: deletePassword,
+		Text:           replyText,
+		ThreadId:       threadID,
+	}
+	createResp, err := client.CreateReplyWithResponse(context.Background(), board, createBody)
+	require.NoError(t, err)
+
+	replyID := string(createResp.Body)
+
+	reportResp, err := client.ReportReplyWithResponse(context.Background(), board, clapi.ReportReplyBody{
+		ReplyId:  replyID,
+		ThreadId: threadID,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "reported", string(reportResp.Body))
+}
+
 func TestDeleteReply(t *testing.T) {
 	s := newTestServer()
 	defer s.Close()

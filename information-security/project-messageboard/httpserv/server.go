@@ -14,6 +14,8 @@ import (
 const (
 	DeleteRespSuccess           = "success"
 	DeleteRespIncorrectPassword = "incorrect password"
+
+	ReportRespSuccess = "reported"
 )
 
 var _ api.StrictServerInterface = &Server{}
@@ -80,7 +82,7 @@ func (s *Server) ReportThread(ctx context.Context, req api.ReportThreadRequestOb
 	if err := s.msgServ.ReportThread(ctx, req.Board, req.Body.ThreadId); err != nil {
 		return nil, fmt.Errorf("report thread: %w", err)
 	}
-	return api.ReportThread200TextResponse("reported"), nil
+	return api.ReportThread200TextResponse(ReportRespSuccess), nil
 }
 
 func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObject) (api.CreateReplyResponseObject, error) {
@@ -126,6 +128,13 @@ func (s *Server) GetReplies(ctx context.Context, req api.GetRepliesRequestObject
 	}
 
 	return api.GetReplies200JSONResponse(toAPIThread(thread)), nil
+}
+
+func (s *Server) ReportReply(ctx context.Context, req api.ReportReplyRequestObject) (api.ReportReplyResponseObject, error) {
+	if err := s.msgServ.ReportReply(ctx, req.Board, req.Body.ThreadId, req.Body.ReplyId); err != nil {
+		return nil, fmt.Errorf("report reply: %w", err)
+	}
+	return api.ReportReply200TextResponse(ReportRespSuccess), nil
 }
 
 func toAPIThread(thread msgboard.ThreadRes) api.Thread {
