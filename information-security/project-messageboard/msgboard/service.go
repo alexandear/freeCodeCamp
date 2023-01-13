@@ -162,6 +162,26 @@ func (s *Service) DeleteThread(ctx context.Context, param DeleteThreadParam) (bo
 	return true, nil
 }
 
+func (s *Service) ReportThread(ctx context.Context, board, threadID string) error {
+	threadObjectID, err := primitive.ObjectIDFromHex(threadID)
+	if err != nil {
+		return fmt.Errorf("wrong object id: %w", err)
+	}
+
+	res, err := s.threads.UpdateOne(ctx,
+		bson.D{{"_id", threadObjectID}, {"board", board}},
+		bson.D{{"$set", bson.D{{"is_reported", true}}}})
+	if err != nil {
+		return fmt.Errorf("update one: %w", err)
+	}
+
+	if res.MatchedCount != 1 {
+		return fmt.Errorf("thread not found")
+	}
+
+	return nil
+}
+
 func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (string, error) {
 	threadObjectID, err := primitive.ObjectIDFromHex(param.ThreadID)
 	if err != nil {
@@ -183,6 +203,7 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 	_, err = s.replies.InsertOne(ctx, bson.D{
 		{"_id", replyID},
 		{"thread_id", param.ThreadID},
+		{"board", param.Board},
 		{"text", param.Text},
 		{"created_on", n},
 		{"delete_password", deletePassword},
@@ -223,6 +244,7 @@ func (s *Service) DeleteReply(ctx context.Context, param DeleteReplyParam) (bool
 	res, err := s.replies.UpdateOne(ctx, bson.D{
 		{"_id", replyObjectID},
 		{"thread_id", param.ThreadID},
+		{"board", param.Board},
 		{"delete_password", deletePassword},
 	}, bson.D{{"$set", bson.D{{"text", "[deleted]"}}}})
 	if err != nil {

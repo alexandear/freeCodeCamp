@@ -32,6 +32,7 @@ func (t *storageThread) ToThread(replies []ReplyRes) ThreadRes {
 type storageReply struct {
 	ReplyID        string    `bson:"_id"`
 	ThreadID       string    `bson:"thread_id"`
+	Board          string    `bson:"board"`
 	Text           string    `bson:"text"`
 	CreatedOn      time.Time `bson:"created_on"`
 	DeletePassword []byte    `bson:"delete_password"`

@@ -111,6 +111,32 @@ func TestDeleteThread(t *testing.T) {
 	assert.Equal(t, "success", string(deleteRespSuccess.Body))
 }
 
+func TestReportThread(t *testing.T) {
+	s := newTestServer()
+	defer s.Close()
+
+	client := newTestClient(t, s.URL)
+
+	board := gofakeit.Animal()
+	text := gofakeit.BuzzWord()
+	deletePassword := gofakeit.NounAbstract()
+
+	createResp, err := client.CreateThreadWithResponse(context.Background(), board, clapi.CreateThreadJSONRequestBody{
+		Text:           text,
+		DeletePassword: deletePassword,
+	})
+	require.NoError(t, err)
+
+	threadID := string(createResp.Body)
+
+	reportResp, err := client.ReportThreadWithResponse(context.Background(), board, clapi.ReportThreadBody{
+		ThreadId: threadID,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "reported", string(reportResp.Body))
+}
+
 func TestCreateReply(t *testing.T) {
 	s := newTestServer()
 	defer s.Close()

@@ -34,6 +34,9 @@ type ServerInterface interface {
 
 	// (POST /api/threads/{board})
 	CreateThread(w http.ResponseWriter, r *http.Request, board Board)
+
+	// (PUT /api/threads/{board})
+	ReportThread(w http.ResponseWriter, r *http.Request, board Board)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -219,6 +222,32 @@ func (siw *ServerInterfaceWrapper) CreateThread(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// ReportThread operation middleware
+func (siw *ServerInterfaceWrapper) ReportThread(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "board" -------------
+	var board Board
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "board", runtime.ParamLocationPath, chi.URLParam(r, "board"), &board)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "board", Err: err})
+		return
+	}
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReportThread(w, r, board)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -349,6 +378,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/threads/{board}", wrapper.CreateThread)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/threads/{board}", wrapper.ReportThread)
 	})
 
 	return r
@@ -547,6 +579,38 @@ func (response CreateThreaddefaultTextResponse) VisitCreateThreadResponse(w http
 	return err
 }
 
+type ReportThreadRequestObject struct {
+	Board Board `json:"board"`
+	Body  *ReportThreadJSONRequestBody
+}
+
+type ReportThreadResponseObject interface {
+	VisitReportThreadResponse(w http.ResponseWriter) error
+}
+
+type ReportThread200TextResponse string
+
+func (response ReportThread200TextResponse) VisitReportThreadResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(200)
+
+	_, err := w.Write([]byte(response))
+	return err
+}
+
+type ReportThreaddefaultTextResponse struct {
+	Body       string
+	StatusCode int
+}
+
+func (response ReportThreaddefaultTextResponse) VisitReportThreadResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(response.StatusCode)
+
+	_, err := w.Write([]byte(response.Body))
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -567,6 +631,9 @@ type StrictServerInterface interface {
 
 	// (POST /api/threads/{board})
 	CreateThread(ctx context.Context, request CreateThreadRequestObject) (CreateThreadResponseObject, error)
+
+	// (PUT /api/threads/{board})
+	ReportThread(ctx context.Context, request ReportThreadRequestObject) (ReportThreadResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, args interface{}) (interface{}, error)
@@ -803,6 +870,39 @@ func (sh *strictHandler) CreateThread(w http.ResponseWriter, r *http.Request, bo
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateThreadResponseObject); ok {
 		if err := validResponse.VisitCreateThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("Unexpected response type: %T", response))
+	}
+}
+
+// ReportThread operation middleware
+func (sh *strictHandler) ReportThread(w http.ResponseWriter, r *http.Request, board Board) {
+	var request ReportThreadRequestObject
+
+	request.Board = board
+
+	var body ReportThreadJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReportThread(ctx, request.(ReportThreadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReportThread")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReportThreadResponseObject); ok {
+		if err := validResponse.VisitReportThreadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

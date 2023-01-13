@@ -34,7 +34,6 @@ paths:
       operationId: getThreads
       parameters:
         - $ref: "#/components/parameters/Board"
-
       responses:
         200:
           description: OK
@@ -44,6 +43,25 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Thread"
+        default:
+          $ref: "#/components/responses/Default"
+    put:
+      operationId: reportThread
+      parameters:
+        - $ref: "#/components/parameters/Board"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportThreadBody"
+      responses:
+        200:
+          description: Returns 'reported'
+          content:
+            text/plain:
+              schema:
+                type: string
         default:
           $ref: "#/components/responses/Default"
     delete:
@@ -150,6 +168,13 @@ components:
       required:
         - thread_id
         - delete_password
+    ReportThreadBody:
+      type: object
+      properties:
+        thread_id:
+          type: string
+      required:
+        - thread_id
     CreateReplyBody:
       type: object
       properties:

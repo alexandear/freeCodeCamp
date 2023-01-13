@@ -76,6 +76,13 @@ func (s *Server) DeleteThread(ctx context.Context, req api.DeleteThreadRequestOb
 	return api.DeleteThread200TextResponse(DeleteRespIncorrectPassword), nil
 }
 
+func (s *Server) ReportThread(ctx context.Context, req api.ReportThreadRequestObject) (api.ReportThreadResponseObject, error) {
+	if err := s.msgServ.ReportThread(ctx, req.Board, req.Body.ThreadId); err != nil {
+		return nil, fmt.Errorf("report thread: %w", err)
+	}
+	return api.ReportThread200TextResponse("reported"), nil
+}
+
 func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObject) (api.CreateReplyResponseObject, error) {
 	body := req.JSONBody
 	if req.FormdataBody != nil {
