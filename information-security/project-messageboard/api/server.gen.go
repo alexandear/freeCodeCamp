@@ -17,6 +17,9 @@ import (
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (DELETE /api/replies/{board})
+	DeleteReply(w http.ResponseWriter, r *http.Request, board Board)
+
 	// (GET /api/replies/{board})
 	GetReplies(w http.ResponseWriter, r *http.Request, board Board, params GetRepliesParams)
 
@@ -41,6 +44,32 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// DeleteReply operation middleware
+func (siw *ServerInterfaceWrapper) DeleteReply(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "board" -------------
+	var board Board
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "board", runtime.ParamLocationPath, chi.URLParam(r, "board"), &board)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "board", Err: err})
+		return
+	}
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteReply(w, r, board)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // GetReplies operation middleware
 func (siw *ServerInterfaceWrapper) GetReplies(w http.ResponseWriter, r *http.Request) {
@@ -304,6 +333,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/replies/{board}", wrapper.DeleteReply)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/replies/{board}", wrapper.GetReplies)
 	})
 	r.Group(func(r chi.Router) {
@@ -323,6 +355,38 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 }
 
 type DefaultTextResponse string
+
+type DeleteReplyRequestObject struct {
+	Board Board `json:"board"`
+	Body  *DeleteReplyJSONRequestBody
+}
+
+type DeleteReplyResponseObject interface {
+	VisitDeleteReplyResponse(w http.ResponseWriter) error
+}
+
+type DeleteReply200TextResponse string
+
+func (response DeleteReply200TextResponse) VisitDeleteReplyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(200)
+
+	_, err := w.Write([]byte(response))
+	return err
+}
+
+type DeleteReplydefaultTextResponse struct {
+	Body       string
+	StatusCode int
+}
+
+func (response DeleteReplydefaultTextResponse) VisitDeleteReplyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(response.StatusCode)
+
+	_, err := w.Write([]byte(response.Body))
+	return err
+}
 
 type GetRepliesRequestObject struct {
 	Board  Board `json:"board"`
@@ -486,6 +550,9 @@ func (response CreateThreaddefaultTextResponse) VisitCreateThreadResponse(w http
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
+	// (DELETE /api/replies/{board})
+	DeleteReply(ctx context.Context, request DeleteReplyRequestObject) (DeleteReplyResponseObject, error)
+
 	// (GET /api/replies/{board})
 	GetReplies(ctx context.Context, request GetRepliesRequestObject) (GetRepliesResponseObject, error)
 
@@ -530,6 +597,39 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// DeleteReply operation middleware
+func (sh *strictHandler) DeleteReply(w http.ResponseWriter, r *http.Request, board Board) {
+	var request DeleteReplyRequestObject
+
+	request.Board = board
+
+	var body DeleteReplyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteReply(ctx, request.(DeleteReplyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteReply")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteReplyResponseObject); ok {
+		if err := validResponse.VisitDeleteReplyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("Unexpected response type: %T", response))
+	}
 }
 
 // GetReplies operation middleware

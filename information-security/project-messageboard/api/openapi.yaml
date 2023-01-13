@@ -58,14 +58,11 @@ paths:
               $ref: "#/components/schemas/DeleteThreadBody"
       responses:
         200:
-          description: OK
+          description: Returns 'success' or 'incorrect password'
           content:
             text/plain:
               schema:
                 type: string
-                enum:
-                  - "success"
-                  - "incorrect password"
         default:
           $ref: "#/components/responses/Default"
 
@@ -111,6 +108,25 @@ paths:
                 $ref: "#/components/schemas/Thread"
         default:
           $ref: "#/components/responses/Default"
+    delete:
+      operationId: deleteReply
+      parameters:
+        - $ref: "#/components/parameters/Board"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteReplyBody"
+      responses:
+        200:
+          description: Returns 'success' or 'incorrect password'
+          content:
+            text/plain:
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Default"
 
 components:
   schemas:
@@ -147,6 +163,19 @@ components:
         - text
         - delete_password
         - thread_id
+    DeleteReplyBody:
+      type: object
+      properties:
+        thread_id:
+          type: string
+        reply_id:
+          type: string
+        delete_password:
+          type: string
+      required:
+        - thread_id
+        - reply_id
+        - delete_password
 
     Reply:
       type: object

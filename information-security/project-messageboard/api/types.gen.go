@@ -20,6 +20,13 @@ type CreateThreadBody struct {
 	Text           string `json:"text"`
 }
 
+// DeleteReplyBody defines model for DeleteReplyBody.
+type DeleteReplyBody struct {
+	DeletePassword string `json:"delete_password"`
+	ReplyId        string `json:"reply_id"`
+	ThreadId       string `json:"thread_id"`
+}
+
 // DeleteThreadBody defines model for DeleteThreadBody.
 type DeleteThreadBody struct {
 	DeletePassword string `json:"delete_password"`
@@ -49,6 +56,9 @@ type Board = string
 type GetRepliesParams struct {
 	ThreadId string `form:"thread_id" json:"thread_id"`
 }
+
+// DeleteReplyJSONRequestBody defines body for DeleteReply for application/json ContentType.
+type DeleteReplyJSONRequestBody = DeleteReplyBody
 
 // CreateReplyJSONRequestBody defines body for CreateReply for application/json ContentType.
 type CreateReplyJSONRequestBody = CreateReplyBody

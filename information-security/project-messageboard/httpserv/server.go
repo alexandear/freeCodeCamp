@@ -12,8 +12,8 @@ import (
 //go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4 --config=server.cfg.yaml ../api/openapi.yaml
 
 const (
-	DeleteThreadRespSuccess           = "success"
-	DeleteThreadRespIncorrectPassword = "incorrect password"
+	DeleteRespSuccess           = "success"
+	DeleteRespIncorrectPassword = "incorrect password"
 )
 
 var _ api.StrictServerInterface = &Server{}
@@ -71,9 +71,9 @@ func (s *Server) DeleteThread(ctx context.Context, req api.DeleteThreadRequestOb
 	}
 
 	if ifDeleted {
-		return api.DeleteThread200TextResponse(DeleteThreadRespSuccess), nil
+		return api.DeleteThread200TextResponse(DeleteRespSuccess), nil
 	}
-	return api.DeleteThread200TextResponse(DeleteThreadRespIncorrectPassword), nil
+	return api.DeleteThread200TextResponse(DeleteRespIncorrectPassword), nil
 }
 
 func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObject) (api.CreateReplyResponseObject, error) {
@@ -92,6 +92,23 @@ func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObje
 	}
 
 	return api.CreateReply200TextResponse(replyID), nil
+}
+
+func (s *Server) DeleteReply(ctx context.Context, req api.DeleteReplyRequestObject) (api.DeleteReplyResponseObject, error) {
+	ifDeleted, err := s.msgServ.DeleteReply(ctx, msgboard.DeleteReplyParam{
+		Board:          req.Board,
+		ThreadID:       req.Body.ThreadId,
+		ReplyID:        req.Body.ReplyId,
+		DeletePassword: req.Body.DeletePassword,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("delete reply: %w", err)
+	}
+
+	if ifDeleted {
+		return api.DeleteReply200TextResponse(DeleteRespSuccess), nil
+	}
+	return api.DeleteReply200TextResponse(DeleteRespIncorrectPassword), nil
 }
 
 func (s *Server) GetReplies(ctx context.Context, req api.GetRepliesRequestObject) (api.GetRepliesResponseObject, error) {

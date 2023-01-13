@@ -43,6 +43,13 @@ type CreateReplyParam struct {
 	ThreadID       string
 }
 
+type DeleteReplyParam struct {
+	Board          string
+	ThreadID       string
+	ReplyID        string
+	DeletePassword string
+}
+
 type ThreadRes struct {
 	ThreadID   string
 	Text       string
@@ -205,6 +212,29 @@ func (s *Service) RepliesForThread(ctx context.Context, threadID string, limit i
 	}
 
 	return replies, nil
+}
+
+func (s *Service) DeleteReply(ctx context.Context, param DeleteReplyParam) (bool, error) {
+	replyObjectID, err := primitive.ObjectIDFromHex(param.ReplyID)
+	if err != nil {
+		return false, fmt.Errorf("wrong object id: %w", err)
+	}
+
+	deletePassword := makeHashPassword(param.DeletePassword)
+	res, err := s.replies.UpdateOne(ctx, bson.D{
+		{"_id", replyObjectID},
+		{"thread_id", param.ThreadID},
+		{"delete_password", deletePassword},
+	}, bson.D{{"$set", bson.D{{"text", "[deleted]"}}}})
+	if err != nil {
+		return false, fmt.Errorf("delete one: %w", err)
+	}
+
+	if res.ModifiedCount == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func now() time.Time {
