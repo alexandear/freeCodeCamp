@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"context"
-	"embed"
-	"io/fs"
 	"log"
 	"net/http"
 	"strconv"
@@ -33,7 +31,7 @@ type Config struct {
 	RunTestsOnStart bool `env:"RUN_TESTS_ON_START" envDefault:"false"`
 }
 
-func ExecServer(embeddedFiles embed.FS) {
+func ExecServer() {
 	var cfg Config
 	if err := env.Parse(&cfg); err != nil {
 		log.Fatalf("Parse env: %v", err)
@@ -58,16 +56,18 @@ func ExecServer(embeddedFiles embed.FS) {
 	r.Use(middleware.SetHeader("Referrer-Policy", "same-origin"))
 	fcc.RegistersHandlers(r)
 
-	publicFS, err := fs.Sub(embeddedFiles, "public")
-	if err != nil {
-		log.Fatalf("sub public: %v", err)
-	}
-	r.Handle("/public/*", http.StripPrefix("/public", http.FileServer(http.FS(publicFS))))
-	viewsFS, err := fs.Sub(embeddedFiles, "views")
-	if err != nil {
-		log.Fatalf("sub views: %v", err)
-	}
-	r.Handle("/*", http.FileServer(http.FS(viewsFS)))
+	r.Get("/public/style.css", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "public/style.css")
+	})
+	r.Get("/b/{board}/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "views/board.html")
+	})
+	r.Get("/b/{board}{threadId}", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "views/thread.html")
+	})
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "views/index.html")
+	})
 
 	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
 	clientOptions := options.Client().ApplyURI(cfg.MongodbURI).SetServerAPIOptions(serverAPIOptions)
