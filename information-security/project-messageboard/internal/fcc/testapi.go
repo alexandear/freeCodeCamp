@@ -6,11 +6,32 @@ import (
 	"strings"
 
 	chi "github.com/go-chi/chi/v5"
+
+	"messageboard/internal/gotest"
 )
 
-func FCC() func(next http.Handler) http.Handler {
+func FCC(tr *gotest.TestResults) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
+			if tr != nil && r.Method == http.MethodGet && r.URL.Path == "/_api/get-tests" {
+				type result struct {
+					Title string `json:"title"`
+					State string `json:"state"`
+				}
+
+				results := make([]result, 0, len(tr.TestResults))
+				for title, res := range tr.TestResults {
+					results = append(results, result{
+						Title: title,
+						State: string(res.Status),
+					})
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(&results)
+				return
+			}
+
 			defer func() {
 				if r.Method == http.MethodGet && r.URL.Path == "/_api/app-info" {
 					var header struct {

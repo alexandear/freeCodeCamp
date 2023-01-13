@@ -19,14 +19,18 @@ import (
 	"messageboard/api"
 	"messageboard/httpserv"
 	"messageboard/internal/fcc"
+	"messageboard/internal/gotest"
 	"messageboard/msgboard"
 )
 
 type Config struct {
 	Port        int    `env:"PORT"`
 	Environment string `env:"ENVIRONMENT"`
+
 	MongodbURI  string `env:"MONGODB_URI"`
 	MongodbName string `env:"MONGODB_NAME" envDefault:"message_board"`
+
+	RunTestsOnStart bool `env:"RUN_TESTS_ON_START" envDefault:"false"`
 }
 
 func ExecServer(embeddedFiles embed.FS) {
@@ -35,9 +39,20 @@ func ExecServer(embeddedFiles embed.FS) {
 		log.Fatalf("Parse env: %v", err)
 	}
 
+	var tr *gotest.TestResults
+	if cfg.RunTestsOnStart {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		res, err := gotest.Run(ctx, "test", nil, true)
+		if err != nil {
+			log.Fatalf("Run failed")
+		}
+		tr = res
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	r.Use(cors.AllowAll().Handler, fcc.FCC()) // for testing purposes
+	r.Use(cors.AllowAll().Handler, fcc.FCC(tr)) // for testing purposes
 	r.Use(middleware.SetHeader("X-DNS-Prefetch-Control", "off"))
 	r.Use(middleware.SetHeader("X-Frame-Options", "SAMEORIGIN"))
 	r.Use(middleware.SetHeader("Referrer-Policy", "same-origin"))
