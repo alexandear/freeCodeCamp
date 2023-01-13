@@ -46,6 +46,28 @@ paths:
                   $ref: "#/components/schemas/Thread"
         default:
           $ref: "#/components/responses/Default"
+    delete:
+      operationId: deleteThread
+      parameters:
+        - $ref: "#/components/parameters/Board"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteThreadBody"
+      responses:
+        200:
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                enum:
+                  - "success"
+                  - "incorrect password"
+        default:
+          $ref: "#/components/responses/Default"
 
   /api/replies/{board}:
     post:
@@ -101,6 +123,16 @@ components:
           type: string
       required:
         - text
+        - delete_password
+    DeleteThreadBody:
+      type: object
+      properties:
+        thread_id:
+          type: string
+        delete_password:
+          type: string
+      required:
+        - thread_id
         - delete_password
     CreateReplyBody:
       type: object

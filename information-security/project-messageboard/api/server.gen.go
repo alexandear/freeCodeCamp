@@ -23,6 +23,9 @@ type ServerInterface interface {
 	// (POST /api/replies/{board})
 	CreateReply(w http.ResponseWriter, r *http.Request, board Board)
 
+	// (DELETE /api/threads/{board})
+	DeleteThread(w http.ResponseWriter, r *http.Request, board Board)
+
 	// (GET /api/threads/{board})
 	GetThreads(w http.ResponseWriter, r *http.Request, board Board)
 
@@ -100,6 +103,32 @@ func (siw *ServerInterfaceWrapper) CreateReply(w http.ResponseWriter, r *http.Re
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateReply(w, r, board)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// DeleteThread operation middleware
+func (siw *ServerInterfaceWrapper) DeleteThread(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "board" -------------
+	var board Board
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "board", runtime.ParamLocationPath, chi.URLParam(r, "board"), &board)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "board", Err: err})
+		return
+	}
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteThread(w, r, board)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -281,6 +310,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/replies/{board}", wrapper.CreateReply)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/threads/{board}", wrapper.DeleteThread)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/threads/{board}", wrapper.GetThreads)
 	})
 	r.Group(func(r chi.Router) {
@@ -349,6 +381,38 @@ type CreateReplydefaultTextResponse struct {
 }
 
 func (response CreateReplydefaultTextResponse) VisitCreateReplyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(response.StatusCode)
+
+	_, err := w.Write([]byte(response.Body))
+	return err
+}
+
+type DeleteThreadRequestObject struct {
+	Board Board `json:"board"`
+	Body  *DeleteThreadJSONRequestBody
+}
+
+type DeleteThreadResponseObject interface {
+	VisitDeleteThreadResponse(w http.ResponseWriter) error
+}
+
+type DeleteThread200TextResponse string
+
+func (response DeleteThread200TextResponse) VisitDeleteThreadResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(200)
+
+	_, err := w.Write([]byte(response))
+	return err
+}
+
+type DeleteThreaddefaultTextResponse struct {
+	Body       string
+	StatusCode int
+}
+
+func (response DeleteThreaddefaultTextResponse) VisitDeleteThreadResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(response.StatusCode)
 
@@ -427,6 +491,9 @@ type StrictServerInterface interface {
 
 	// (POST /api/replies/{board})
 	CreateReply(ctx context.Context, request CreateReplyRequestObject) (CreateReplyResponseObject, error)
+
+	// (DELETE /api/threads/{board})
+	DeleteThread(ctx context.Context, request DeleteThreadRequestObject) (DeleteThreadResponseObject, error)
 
 	// (GET /api/threads/{board})
 	GetThreads(ctx context.Context, request GetThreadsRequestObject) (GetThreadsResponseObject, error)
@@ -531,6 +598,39 @@ func (sh *strictHandler) CreateReply(w http.ResponseWriter, r *http.Request, boa
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateReplyResponseObject); ok {
 		if err := validResponse.VisitCreateReplyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("Unexpected response type: %T", response))
+	}
+}
+
+// DeleteThread operation middleware
+func (sh *strictHandler) DeleteThread(w http.ResponseWriter, r *http.Request, board Board) {
+	var request DeleteThreadRequestObject
+
+	request.Board = board
+
+	var body DeleteThreadJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteThread(ctx, request.(DeleteThreadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteThread")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteThreadResponseObject); ok {
+		if err := validResponse.VisitDeleteThreadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

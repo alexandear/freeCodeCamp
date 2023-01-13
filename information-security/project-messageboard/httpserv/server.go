@@ -11,6 +11,11 @@ import (
 //go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4 --config=types.cfg.yaml ../api/openapi.yaml
 //go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4 --config=server.cfg.yaml ../api/openapi.yaml
 
+const (
+	DeleteThreadRespSuccess           = "success"
+	DeleteThreadRespIncorrectPassword = "incorrect password"
+)
+
 var _ api.StrictServerInterface = &Server{}
 
 type Server struct {
@@ -53,6 +58,22 @@ func (s *Server) CreateThread(ctx context.Context, req api.CreateThreadRequestOb
 	}
 
 	return api.CreateThread200TextResponse(threadID), nil
+}
+
+func (s *Server) DeleteThread(ctx context.Context, req api.DeleteThreadRequestObject) (api.DeleteThreadResponseObject, error) {
+	ifDeleted, err := s.msgServ.DeleteThread(ctx, msgboard.DeleteThreadParam{
+		Board:          req.Board,
+		ThreadID:       req.Body.ThreadId,
+		DeletePassword: req.Body.DeletePassword,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("delete thread: %w", err)
+	}
+
+	if ifDeleted {
+		return api.DeleteThread200TextResponse(DeleteThreadRespSuccess), nil
+	}
+	return api.DeleteThread200TextResponse(DeleteThreadRespIncorrectPassword), nil
 }
 
 func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObject) (api.CreateReplyResponseObject, error) {

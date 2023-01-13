@@ -30,6 +30,12 @@ type CreateThreadBody struct {
 	Text           string `json:"text"`
 }
 
+// DeleteThreadBody defines model for DeleteThreadBody.
+type DeleteThreadBody struct {
+	DeletePassword string `json:"delete_password"`
+	ThreadId       string `json:"thread_id"`
+}
+
 // Reply defines model for Reply.
 type Reply struct {
 	Id        string    `json:"_id"`
@@ -59,6 +65,9 @@ type CreateReplyJSONRequestBody = CreateReplyBody
 
 // CreateReplyFormdataRequestBody defines body for CreateReply for application/x-www-form-urlencoded ContentType.
 type CreateReplyFormdataRequestBody = CreateReplyBody
+
+// DeleteThreadJSONRequestBody defines body for DeleteThread for application/json ContentType.
+type DeleteThreadJSONRequestBody = DeleteThreadBody
 
 // CreateThreadJSONRequestBody defines body for CreateThread for application/json ContentType.
 type CreateThreadJSONRequestBody = CreateThreadBody
@@ -149,6 +158,11 @@ type ClientInterface interface {
 
 	CreateReplyWithFormdataBody(ctx context.Context, board Board, body CreateReplyFormdataRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteThread request with any body
+	DeleteThreadWithBody(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DeleteThread(ctx context.Context, board Board, body DeleteThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetThreads request
 	GetThreads(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -198,6 +212,30 @@ func (c *Client) CreateReply(ctx context.Context, board Board, body CreateReplyJ
 
 func (c *Client) CreateReplyWithFormdataBody(ctx context.Context, board Board, body CreateReplyFormdataRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateReplyRequestWithFormdataBody(c.Server, board, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteThreadWithBody(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteThreadRequestWithBody(c.Server, board, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteThread(ctx context.Context, board Board, body DeleteThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteThreadRequest(c.Server, board, body)
 	if err != nil {
 		return nil, err
 	}
@@ -364,6 +402,53 @@ func NewCreateReplyRequestWithBody(server string, board Board, contentType strin
 	return req, nil
 }
 
+// NewDeleteThreadRequest calls the generic DeleteThread builder with application/json body
+func NewDeleteThreadRequest(server string, board Board, body DeleteThreadJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeleteThreadRequestWithBody(server, board, "application/json", bodyReader)
+}
+
+// NewDeleteThreadRequestWithBody generates requests for DeleteThread with any type of body
+func NewDeleteThreadRequestWithBody(server string, board Board, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "board", runtime.ParamLocationPath, board)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/threads/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetThreadsRequest generates requests for GetThreads
 func NewGetThreadsRequest(server string, board Board) (*http.Request, error) {
 	var err error
@@ -509,6 +594,11 @@ type ClientWithResponsesInterface interface {
 
 	CreateReplyWithFormdataBodyWithResponse(ctx context.Context, board Board, body CreateReplyFormdataRequestBody, reqEditors ...RequestEditorFn) (*CreateReplyResponse, error)
 
+	// DeleteThread request with any body
+	DeleteThreadWithBodyWithResponse(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteThreadResponse, error)
+
+	DeleteThreadWithResponse(ctx context.Context, board Board, body DeleteThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteThreadResponse, error)
+
 	// GetThreads request
 	GetThreadsWithResponse(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error)
 
@@ -557,6 +647,27 @@ func (r CreateReplyResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CreateReplyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteThreadResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteThreadResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteThreadResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -640,6 +751,23 @@ func (c *ClientWithResponses) CreateReplyWithFormdataBodyWithResponse(ctx contex
 	return ParseCreateReplyResponse(rsp)
 }
 
+// DeleteThreadWithBodyWithResponse request with arbitrary body returning *DeleteThreadResponse
+func (c *ClientWithResponses) DeleteThreadWithBodyWithResponse(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteThreadResponse, error) {
+	rsp, err := c.DeleteThreadWithBody(ctx, board, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteThreadResponse(rsp)
+}
+
+func (c *ClientWithResponses) DeleteThreadWithResponse(ctx context.Context, board Board, body DeleteThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteThreadResponse, error) {
+	rsp, err := c.DeleteThread(ctx, board, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteThreadResponse(rsp)
+}
+
 // GetThreadsWithResponse request returning *GetThreadsResponse
 func (c *ClientWithResponses) GetThreadsWithResponse(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error) {
 	rsp, err := c.GetThreads(ctx, board, reqEditors...)
@@ -709,6 +837,22 @@ func ParseCreateReplyResponse(rsp *http.Response) (*CreateReplyResponse, error) 
 	}
 
 	response := &CreateReplyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseDeleteThreadResponse parses an HTTP response from a DeleteThreadWithResponse call
+func ParseDeleteThreadResponse(rsp *http.Response) (*DeleteThreadResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteThreadResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

@@ -1,7 +1,9 @@
 package msgboard
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"time"
@@ -28,6 +30,12 @@ type CreateThreadParam struct {
 	DeletePassword string
 }
 
+type DeleteThreadParam struct {
+	Board          string
+	ThreadID       string
+	DeletePassword string
+}
+
 type CreateReplyParam struct {
 	Board          string
 	Text           string
@@ -45,10 +53,11 @@ type ThreadRes struct {
 }
 
 type ReplyRes struct {
-	ReplyID   string
-	ThreadID  string
-	Text      string
-	CreatedOn time.Time
+	ReplyID        string
+	ThreadID       string
+	Text           string
+	CreatedOn      time.Time
+	DeletePassword []byte
 }
 
 func NewService(db *mongo.Database) *Service {
@@ -107,12 +116,14 @@ func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (st
 	createdOn := now()
 
 	threadID := primitive.NewObjectID()
+	deletePassword := makeHashPassword(param.DeletePassword)
 	_, err := s.threads.InsertOne(ctx, bson.D{
 		{"_id", threadID},
 		{"board", param.Board},
 		{"text", param.Text},
 		{"created_on", createdOn},
 		{"bumped_on", createdOn},
+		{"delete_password", deletePassword},
 		{"is_reported", false},
 	})
 	if err != nil {
@@ -120,6 +131,29 @@ func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (st
 	}
 
 	return threadID.Hex(), nil
+}
+
+func (s *Service) DeleteThread(ctx context.Context, param DeleteThreadParam) (bool, error) {
+	threadObjectID, err := primitive.ObjectIDFromHex(param.ThreadID)
+	if err != nil {
+		return false, fmt.Errorf("wrong object id: %w", err)
+	}
+
+	deletePassword := makeHashPassword(param.DeletePassword)
+	res, err := s.threads.DeleteOne(ctx, bson.D{{"_id", threadObjectID}, {"delete_password", deletePassword}})
+	if err != nil {
+		return false, fmt.Errorf("delete one: %w", err)
+	}
+
+	if res.DeletedCount == 0 {
+		return false, nil
+	}
+
+	if _, err := s.replies.DeleteMany(ctx, bson.D{{"thread_id", param.ThreadID}}); err != nil {
+		return false, fmt.Errorf("delete replies: %w", err)
+	}
+
+	return true, nil
 }
 
 func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (string, error) {
@@ -139,13 +173,13 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 	}
 
 	replyID := primitive.NewObjectID()
-
+	deletePassword := makeHashPassword(param.DeletePassword)
 	_, err = s.replies.InsertOne(ctx, bson.D{
 		{"_id", replyID},
 		{"thread_id", param.ThreadID},
 		{"text", param.Text},
 		{"created_on", n},
-		{"delete_password", param.DeletePassword},
+		{"delete_password", deletePassword},
 	})
 	if err != nil {
 		return "", fmt.Errorf("insert one: %w", err)
@@ -175,4 +209,14 @@ func (s *Service) RepliesForThread(ctx context.Context, threadID string, limit i
 
 func now() time.Time {
 	return time.Now().UTC()
+}
+
+func makeHashPassword(password string) []byte {
+	sha := sha256.New()
+	sha.Write([]byte(password))
+	return sha.Sum(nil)
+}
+
+func isHashPasswordEqual(hash []byte, password string) bool {
+	return bytes.Equal(hash, makeHashPassword(password))
 }
