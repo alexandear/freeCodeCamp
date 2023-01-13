@@ -48,9 +48,9 @@ type Thread struct {
 // Board defines model for Board.
 type Board = string
 
-// GetThreadsParams defines parameters for GetThreads.
-type GetThreadsParams struct {
-	ThreadId *string `form:"thread_id,omitempty" json:"thread_id,omitempty"`
+// GetRepliesParams defines parameters for GetReplies.
+type GetRepliesParams struct {
+	ThreadId string `form:"thread_id" json:"thread_id"`
 }
 
 // CreateReplyJSONRequestBody defines body for CreateReply for application/json ContentType.
@@ -138,6 +138,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// GetReplies request
+	GetReplies(ctx context.Context, board Board, params *GetRepliesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CreateReply request with any body
 	CreateReplyWithBody(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -146,7 +149,7 @@ type ClientInterface interface {
 	CreateReplyWithFormdataBody(ctx context.Context, board Board, body CreateReplyFormdataRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetThreads request
-	GetThreads(ctx context.Context, board Board, params *GetThreadsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetThreads(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateThread request with any body
 	CreateThreadWithBody(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -154,6 +157,18 @@ type ClientInterface interface {
 	CreateThread(ctx context.Context, board Board, body CreateThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	CreateThreadWithFormdataBody(ctx context.Context, board Board, body CreateThreadFormdataRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) GetReplies(ctx context.Context, board Board, params *GetRepliesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRepliesRequest(c.Server, board, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) CreateReplyWithBody(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -192,8 +207,8 @@ func (c *Client) CreateReplyWithFormdataBody(ctx context.Context, board Board, b
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetThreads(ctx context.Context, board Board, params *GetThreadsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetThreadsRequest(c.Server, board, params)
+func (c *Client) GetThreads(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetThreadsRequest(c.Server, board)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +253,56 @@ func (c *Client) CreateThreadWithFormdataBody(ctx context.Context, board Board, 
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetRepliesRequest generates requests for GetReplies
+func NewGetRepliesRequest(server string, board Board, params *GetRepliesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "board", runtime.ParamLocationPath, board)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/replies/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if queryFrag, err := runtime.StyleParamWithLocation("form", true, "thread_id", runtime.ParamLocationQuery, params.ThreadId); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewCreateReplyRequest calls the generic CreateReply builder with application/json body
@@ -299,7 +364,7 @@ func NewCreateReplyRequestWithBody(server string, board Board, contentType strin
 }
 
 // NewGetThreadsRequest generates requests for GetThreads
-func NewGetThreadsRequest(server string, board Board, params *GetThreadsParams) (*http.Request, error) {
+func NewGetThreadsRequest(server string, board Board) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -323,26 +388,6 @@ func NewGetThreadsRequest(server string, board Board, params *GetThreadsParams) 
 	if err != nil {
 		return nil, err
 	}
-
-	queryValues := queryURL.Query()
-
-	if params.ThreadId != nil {
-
-		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "thread_id", runtime.ParamLocationQuery, *params.ThreadId); err != nil {
-			return nil, err
-		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-			return nil, err
-		} else {
-			for k, v := range parsed {
-				for _, v2 := range v {
-					queryValues.Add(k, v2)
-				}
-			}
-		}
-
-	}
-
-	queryURL.RawQuery = queryValues.Encode()
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -453,6 +498,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// GetReplies request
+	GetRepliesWithResponse(ctx context.Context, board Board, params *GetRepliesParams, reqEditors ...RequestEditorFn) (*GetRepliesResponse, error)
+
 	// CreateReply request with any body
 	CreateReplyWithBodyWithResponse(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateReplyResponse, error)
 
@@ -461,7 +509,7 @@ type ClientWithResponsesInterface interface {
 	CreateReplyWithFormdataBodyWithResponse(ctx context.Context, board Board, body CreateReplyFormdataRequestBody, reqEditors ...RequestEditorFn) (*CreateReplyResponse, error)
 
 	// GetThreads request
-	GetThreadsWithResponse(ctx context.Context, board Board, params *GetThreadsParams, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error)
+	GetThreadsWithResponse(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error)
 
 	// CreateThread request with any body
 	CreateThreadWithBodyWithResponse(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateThreadResponse, error)
@@ -469,6 +517,28 @@ type ClientWithResponsesInterface interface {
 	CreateThreadWithResponse(ctx context.Context, board Board, body CreateThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateThreadResponse, error)
 
 	CreateThreadWithFormdataBodyWithResponse(ctx context.Context, board Board, body CreateThreadFormdataRequestBody, reqEditors ...RequestEditorFn) (*CreateThreadResponse, error)
+}
+
+type GetRepliesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Thread
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRepliesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRepliesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type CreateReplyResponse struct {
@@ -535,6 +605,15 @@ func (r CreateThreadResponse) StatusCode() int {
 	return 0
 }
 
+// GetRepliesWithResponse request returning *GetRepliesResponse
+func (c *ClientWithResponses) GetRepliesWithResponse(ctx context.Context, board Board, params *GetRepliesParams, reqEditors ...RequestEditorFn) (*GetRepliesResponse, error) {
+	rsp, err := c.GetReplies(ctx, board, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRepliesResponse(rsp)
+}
+
 // CreateReplyWithBodyWithResponse request with arbitrary body returning *CreateReplyResponse
 func (c *ClientWithResponses) CreateReplyWithBodyWithResponse(ctx context.Context, board Board, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateReplyResponse, error) {
 	rsp, err := c.CreateReplyWithBody(ctx, board, contentType, body, reqEditors...)
@@ -561,8 +640,8 @@ func (c *ClientWithResponses) CreateReplyWithFormdataBodyWithResponse(ctx contex
 }
 
 // GetThreadsWithResponse request returning *GetThreadsResponse
-func (c *ClientWithResponses) GetThreadsWithResponse(ctx context.Context, board Board, params *GetThreadsParams, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error) {
-	rsp, err := c.GetThreads(ctx, board, params, reqEditors...)
+func (c *ClientWithResponses) GetThreadsWithResponse(ctx context.Context, board Board, reqEditors ...RequestEditorFn) (*GetThreadsResponse, error) {
+	rsp, err := c.GetThreads(ctx, board, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -592,6 +671,32 @@ func (c *ClientWithResponses) CreateThreadWithFormdataBodyWithResponse(ctx conte
 		return nil, err
 	}
 	return ParseCreateThreadResponse(rsp)
+}
+
+// ParseGetRepliesResponse parses an HTTP response from a GetRepliesWithResponse call
+func ParseGetRepliesResponse(rsp *http.Response) (*GetRepliesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRepliesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Thread
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseCreateReplyResponse parses an HTTP response from a CreateReplyWithResponse call

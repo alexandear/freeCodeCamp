@@ -24,18 +24,6 @@ func NewServer(msgServ *msgboard.Service) *Server {
 }
 
 func (s *Server) GetThreads(ctx context.Context, req api.GetThreadsRequestObject) (api.GetThreadsResponseObject, error) {
-	threadID := req.Params.ThreadId
-	if threadID != nil {
-		thread, err := s.msgServ.Thread(ctx, req.Board, *threadID)
-		if err != nil {
-			return nil, fmt.Errorf("thread: %w", err)
-		}
-
-		return api.GetThreads200JSONResponse{
-			toAPIThread(thread),
-		}, nil
-	}
-
 	threads, err := s.msgServ.Threads(ctx, req.Board)
 	if err != nil {
 		return nil, fmt.Errorf("get msgboard: %w", err)
@@ -83,6 +71,16 @@ func (s *Server) CreateReply(ctx context.Context, req api.CreateReplyRequestObje
 	}
 
 	return api.CreateReply200TextResponse(replyID), nil
+}
+
+func (s *Server) GetReplies(ctx context.Context, req api.GetRepliesRequestObject) (api.GetRepliesResponseObject, error) {
+	threadID := req.Params.ThreadId
+	thread, err := s.msgServ.Thread(ctx, req.Board, threadID)
+	if err != nil {
+		return nil, fmt.Errorf("thread: %w", err)
+	}
+
+	return api.GetReplies200JSONResponse(toAPIThread(thread)), nil
 }
 
 func toAPIThread(thread msgboard.ThreadRes) api.Thread {

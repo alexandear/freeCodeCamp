@@ -38,9 +38,9 @@ type Thread struct {
 // Board defines model for Board.
 type Board = string
 
-// GetThreadsParams defines parameters for GetThreads.
-type GetThreadsParams struct {
-	ThreadId *string `form:"thread_id,omitempty" json:"thread_id,omitempty"`
+// GetRepliesParams defines parameters for GetReplies.
+type GetRepliesParams struct {
+	ThreadId string `form:"thread_id" json:"thread_id"`
 }
 
 // CreateReplyJSONRequestBody defines body for CreateReply for application/json ContentType.

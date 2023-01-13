@@ -34,11 +34,6 @@ paths:
       operationId: getThreads
       parameters:
         - $ref: "#/components/parameters/Board"
-        - in: query
-          name: thread_id
-          schema:
-            type: string
-          required: false
 
       responses:
         200:
@@ -74,6 +69,24 @@ paths:
               schema:
                 description: Reply ID
                 type: string
+        default:
+          $ref: "#/components/responses/Default"
+    get:
+      operationId: getReplies
+      parameters:
+        - $ref: "#/components/parameters/Board"
+        - in: query
+          name: thread_id
+          schema:
+            type: string
+          required: true
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Thread"
         default:
           $ref: "#/components/responses/Default"
 

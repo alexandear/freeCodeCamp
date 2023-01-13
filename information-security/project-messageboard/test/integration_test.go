@@ -62,7 +62,7 @@ func TestCreateNewThread(t *testing.T) {
 	threadID := string(createResp.Body)
 	assert.NotEmpty(t, threadID)
 
-	getResp, err := client.GetThreadsWithResponse(context.Background(), board, &clapi.GetThreadsParams{})
+	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
 	require.NoError(t, err)
 
 	threads := *getResp.JSON200
@@ -115,7 +115,7 @@ func TestCreateReply(t *testing.T) {
 	replyID := string(createResp.Body)
 	assert.NotEmpty(t, replyID)
 
-	getResp, err := client.GetThreadsWithResponse(context.Background(), board, &clapi.GetThreadsParams{})
+	getResp, err := client.GetThreadsWithResponse(context.Background(), board)
 	require.NoError(t, err)
 	require.Len(t, *getResp.JSON200, 1)
 	thread := (*getResp.JSON200)[0]
@@ -126,7 +126,7 @@ func TestCreateReply(t *testing.T) {
 	assert.Equal(t, replyText, reply.Text)
 }
 
-func TestGetThread(t *testing.T) {
+func TestGetReplies(t *testing.T) {
 	s := newTestServer()
 	defer s.Close()
 
@@ -153,13 +153,12 @@ func TestGetThread(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	getResp, err := client.GetThreadsWithResponse(context.Background(), board, &clapi.GetThreadsParams{
-		ThreadId: &threadID,
+	getResp, err := client.GetRepliesWithResponse(context.Background(), board, &clapi.GetRepliesParams{
+		ThreadId: threadID,
 	})
 	require.NoError(t, err)
 
-	require.Len(t, *getResp.JSON200, 1)
-	thread := (*getResp.JSON200)[0]
+	thread := getResp.JSON200
 	assert.Equal(t, threadText, thread.Text)
 	assert.Len(t, thread.Replies, 5)
 }
