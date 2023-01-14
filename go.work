@@ -1,0 +1,11 @@
+go 1.19
+
+use (
+	./backend-development/project-exercisetracker
+	./backend-development/project-filemetadata
+	./backend-development/project-headerparser
+	./backend-development/project-timestamp
+	./backend-development/project-urlshortener
+	./information-security/project-messageboard
+	./information-security/project-stockchecker
+)
