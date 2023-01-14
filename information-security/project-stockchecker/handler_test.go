@@ -1,212 +1,155 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/carlmjohnson/requests"
 	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var (
-	client = http.Client{Timeout: 2 * time.Second}
-	db     = newTestMongoDatabase()
-)
-
 func TestHandler_StockPrice_GetOneStock(t *testing.T) {
-	h := NewHandler(echo.New(), NewStockService(db))
-
-	s := httptest.NewServer(h)
+	s := newTestServer()
 	defer s.Close()
 
-	res, err := client.Get(s.URL + "/api/stock-prices?stock=GRMN")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
+	var actual StockPriceResp
+	err := requests.URL(s.URL + "/api/stock-prices?stock=GRMN").ToJSON(&actual).Fetch(context.Background())
 
-	if http.StatusOK != res.StatusCode {
-		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	require.NoError(t, err)
+	assert.NotZero(t, actual.StockData.Price)
+	expected := StockPriceResp{
+		StockData: StockDataResp{
+			Stock: "GRMN",
+			Price: actual.StockData.Price,
+			Likes: 0,
+		},
 	}
-
-	resBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	actual := string(resBytes)
-	var stockPrice StockPriceResp
-	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrice); err != nil {
-		t.Fatal(err)
-	}
-
-	if stockPrice.StockData.Price == 0.0 {
-		t.Fatalf("price must be non-zero")
-	}
-
-	expected := fmt.Sprintf(`{"stockData":{"stock":"GRMN","price":%g,"likes":0}}
-`, stockPrice.StockData.Price)
-	if expected != actual {
-		t.Fatalf("expected %+v, got %+v", expected, actual)
-	}
+	assert.Equal(t, expected, actual)
 }
 
 func TestHandler_StockPrice_GetOneStockAndLike(t *testing.T) {
-	h := NewHandler(echo.New(), NewStockService(db))
-
-	s := httptest.NewServer(h)
+	s := newTestServer()
 	defer s.Close()
 
-	res, err := client.Get(s.URL + "/api/stock-prices?stock=AAPL&like=true")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
+	var actual StockPriceResp
+	err := requests.URL(s.URL + "/api/stock-prices?stock=AAPL&like=true").ToJSON(&actual).Fetch(context.Background())
 
-	if http.StatusOK != res.StatusCode {
-		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
+	require.NoError(t, err)
+	assert.NotZero(t, actual.StockData.Price)
+	expected := StockPriceResp{
+		StockData: StockDataResp{
+			Stock: "AAPL",
+			Price: actual.StockData.Price,
+			Likes: 1,
+		},
 	}
-
-	resBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	actual := string(resBytes)
-	var stockPrice StockPriceResp
-	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrice); err != nil {
-		t.Fatal(err)
-	}
-
-	expected := fmt.Sprintf(`{"stockData":{"stock":"AAPL","price":%g,"likes":1}}
-`, stockPrice.StockData.Price)
-	if expected != actual {
-		t.Fatalf("expected %+v, got %+v", expected, actual)
-	}
+	assert.Equal(t, expected, actual)
 }
 
 func TestHandler_StockPrice_GetOneStockAndLikeFewTimes(t *testing.T) {
-	h := NewHandler(echo.New(), NewStockService(db))
-
-	s := httptest.NewServer(h)
+	s := newTestServer()
 	defer s.Close()
 
-	if _, err := client.Get(s.URL + "/api/stock-prices?stock=MSFT&like=true"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := client.Get(s.URL + "/api/stock-prices?stock=MSFT&like=true"); err != nil {
-		t.Fatal(err)
-	}
-	res, err := client.Get(s.URL + "/api/stock-prices?stock=MSFT&like=true")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
+	err := requests.URL(s.URL + "/api/stock-prices?stock=MSFT&like=true").Fetch(context.Background())
+	require.NoError(t, err)
+	err = requests.URL(s.URL + "/api/stock-prices?stock=MSFT&like=true").Fetch(context.Background())
+	require.NoError(t, err)
 
-	if http.StatusOK != res.StatusCode {
-		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
-	}
+	var actual StockPriceResp
+	err = requests.URL(s.URL + "/api/stock-prices?stock=MSFT&like=true").ToJSON(&actual).Fetch(context.Background())
 
-	resBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
+	require.NoError(t, err)
+	assert.NotZero(t, actual.StockData.Price)
+	expected := StockPriceResp{
+		StockData: StockDataResp{
+			Stock: "MSFT",
+			Price: actual.StockData.Price,
+			Likes: 1,
+		},
 	}
-	actual := string(resBytes)
-	var stockPrice StockPriceResp
-	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrice); err != nil {
-		t.Fatal(err)
-	}
-
-	expected := fmt.Sprintf(`{"stockData":{"stock":"MSFT","price":%g,"likes":1}}
-`, stockPrice.StockData.Price)
-	if expected != actual {
-		t.Fatalf("expected %+v, got %+v", expected, actual)
-	}
+	assert.Equal(t, expected, actual)
 }
 
 func TestHandler_StockPrice_GetTwoStocks(t *testing.T) {
-	h := NewHandler(echo.New(), NewStockService(db))
-
-	s := httptest.NewServer(h)
+	s := newTestServer()
 	defer s.Close()
 
-	res, err := client.Get(s.URL + "/api/stock-prices?stock=META&stock=INTC")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
+	var actual StockPricesResp
+	err := requests.URL(s.URL + "/api/stock-prices?stock=META&stock=INTC").ToJSON(&actual).Fetch(context.Background())
 
-	if http.StatusOK != res.StatusCode {
-		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
-	}
+	require.NoError(t, err)
+	require.Len(t, actual.StockData, 2)
+	assert.NotZero(t, actual.StockData[0].Price)
+	assert.NotZero(t, actual.StockData[1].Price)
 
-	resBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
+	expected := StockPricesResp{
+		StockData: []StockDatasResp{
+			{
+				Stock:    "META",
+				Price:    actual.StockData[0].Price,
+				RelLikes: 0,
+			},
+			{
+				Stock:    "INTC",
+				Price:    actual.StockData[1].Price,
+				RelLikes: 0,
+			},
+		},
 	}
-	actual := string(resBytes)
-	var stockPrices StockPricesResp
-	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrices); err != nil {
-		t.Fatal(err)
-	}
-
-	expected := fmt.Sprintf(`{"stockData":[{"stock":"META","price":%g,"rel_likes":0},{"stock":"INTC","price":%g,"rel_likes":0}]}
-`, stockPrices.StockData[0].Price, stockPrices.StockData[1].Price)
-	if expected != actual {
-		t.Fatalf("expected %+v, got %+v", expected, actual)
-	}
+	assert.Equal(t, expected, actual)
 }
 
 func TestHandler_StockPrice_TwoStocksWithLikes(t *testing.T) {
-	stockServ := NewStockService(db)
+	stockServ := NewStockService(newTestMongoDatabase())
 	h := NewHandler(echo.New(), stockServ)
-
 	s := httptest.NewServer(h)
 	defer s.Close()
 
-	if _, err := client.Get(s.URL + "/api/stock-prices?stock=TSLA&like=true"); err != nil {
-		t.Fatal(err)
-	}
+	err := requests.URL(s.URL + "/api/stock-prices?stock=TSLA&like=true").Fetch(context.Background())
+	require.NoError(t, err)
 	update := bson.D{{"$inc", bson.D{{"likes_count", 2}}}}
-	if _, err := stockServ.stocks.UpdateByID(context.Background(), "TSLA", update); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := client.Get(s.URL + "/api/stock-prices?stock=KO&like=true"); err != nil {
-		t.Fatal(err)
-	}
-	res, err := client.Get(s.URL + "/api/stock-prices?stock=TSLA&stock=KO&like=true")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
+	_, err = stockServ.stocks.UpdateByID(context.Background(), "TSLA", update)
+	require.NoError(t, err)
+	err = requests.URL(s.URL + "/api/stock-prices?stock=KO&like=true").Fetch(context.Background())
+	require.NoError(t, err)
 
-	if http.StatusOK != res.StatusCode {
-		t.Fatalf("expected '200 OK' status, got '%s'", res.Status)
-	}
+	var actual StockPricesResp
+	err = requests.URL(s.URL + "/api/stock-prices?stock=TSLA&stock=KO&like=true").ToJSON(&actual).Fetch(context.Background())
 
-	resBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	actual := string(resBytes)
-	var stockPrices StockPricesResp
-	if err := json.NewDecoder(bytes.NewReader(resBytes)).Decode(&stockPrices); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.Len(t, actual.StockData, 2)
+	assert.NotZero(t, actual.StockData[0].Price)
+	assert.NotZero(t, actual.StockData[1].Price)
 
-	expected := fmt.Sprintf(`{"stockData":[{"stock":"TSLA","price":%g,"rel_likes":2},{"stock":"KO","price":%g,"rel_likes":-2}]}
-`, stockPrices.StockData[0].Price, stockPrices.StockData[1].Price)
-	if expected != actual {
-		t.Fatalf("expected %+v, got %+v", expected, actual)
+	expected := StockPricesResp{
+		StockData: []StockDatasResp{
+			{
+				Stock:    "TSLA",
+				Price:    actual.StockData[0].Price,
+				RelLikes: 2,
+			},
+			{
+				Stock:    "KO",
+				Price:    actual.StockData[1].Price,
+				RelLikes: -2,
+			},
+		},
 	}
+	assert.Equal(t, expected, actual)
+}
+
+func newTestServer() *httptest.Server {
+	h := NewHandler(echo.New(), NewStockService(newTestMongoDatabase()))
+
+	return httptest.NewServer(h)
 }
 
 func newTestMongoDatabase() *mongo.Database {
