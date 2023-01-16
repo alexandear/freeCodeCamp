@@ -1,7 +1,7 @@
 import unittest
 import port_scanner
 
-print("***Tests***")
+
 class UnitTests(unittest.TestCase):
     def test_port_scanner_ip(self):
         ports = port_scanner.get_open_ports("209.216.230.240", [440, 445], False)
@@ -50,6 +50,7 @@ class UnitTests(unittest.TestCase):
         actual = err
         expected = "Error: Invalid IP address"
         self.assertEqual(actual, expected, "Expected 'Error: Invalid IP address'")
+
 
 if __name__ == "__main__":
     unittest.main()
