@@ -1,11 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/imroc/req/v3"
 )
 
 func TestApiHandler_ServeHTTP(t *testing.T) {
@@ -15,30 +16,25 @@ func TestApiHandler_ServeHTTP(t *testing.T) {
 	s := httptest.NewServer(api)
 	defer s.Close()
 
-	req, err := http.NewRequest(http.MethodGet, s.URL+"/api/whoami", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:50.0) Gecko/20100101 Firefox/50.0")
-	client := &http.Client{Timeout: time.Second}
-	res, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
+	client := req.C().SetTimeout(2 * time.Second).DevMode()
 
 	var resp response
-	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+	res, err := client.R().
+		SetHeader("Accept", "application/json").
+		SetHeader("Accept-Language", "en-US,en;q=0.5").
+		SetHeader("X-Real-IP", "172.27.29.34").
+		SetHeader("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:50.0) Gecko/20100101 Firefox/50.0").
+		SetResult(&resp).
+		Get(s.URL + "/api/whoami")
+	if err != nil {
 		t.Fatal(err)
 	}
-
-	if "application/json" != res.Header.Get("Content-Type") {
-		t.Fatalf("must be json content type")
+	if res.IsError() {
+		t.Fatal(res.Err)
 	}
 
 	expected := response{
-		IPAddress: resp.IPAddress,
+		IPAddress: "172.27.29.34",
 		Language:  "en-US,en;q=0.5",
 		Software:  "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:50.0) Gecko/20100101 Firefox/50.0",
 	}

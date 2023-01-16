@@ -24,8 +24,23 @@ type response struct {
 func (h apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(response{
-		IPAddress: r.RemoteAddr,
+		IPAddress: ReadUserIP(r),
 		Language:  r.Header.Get("Accept-Language"),
 		Software:  r.Header.Get("User-Agent"),
 	})
+}
+
+// ReadUserIP returns first non-empty value among the
+// X-Real-Ip, X-Forwarded-for and r.RemoteAddr
+// See https://stackoverflow.com/a/55738279.
+func ReadUserIP(r *http.Request) string {
+	ip := r.Header.Get("X-Real-Ip")
+	if ip != "" {
+		return ip
+	}
+	ip = r.Header.Get("X-Forwarded-For")
+	if ip != "" {
+		return ip
+	}
+	return r.RemoteAddr
 }
