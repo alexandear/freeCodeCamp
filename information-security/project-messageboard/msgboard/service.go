@@ -33,8 +33,8 @@ func NewService(db *mongo.Database) *Service {
 }
 
 func (s *Service) Threads(ctx context.Context, board string) ([]ThreadRes, error) {
-	opts := options.Find().SetLimit(maxReturnedThreadsCount).SetSort(bson.D{{"bumped_on", -1}})
-	cursor, err := s.threads.Find(ctx, bson.D{{"board", board}}, opts)
+	opts := options.Find().SetLimit(maxReturnedThreadsCount).SetSort(bson.M{"bumped_on": -1})
+	cursor, err := s.threads.Find(ctx, bson.M{"board": board}, opts)
 	if err != nil {
 		return nil, fmt.Errorf("find: %w", err)
 	}
@@ -116,17 +116,20 @@ func (s *Service) DeleteThread(ctx context.Context, param DeleteThreadParam) (bo
 
 	res, err := trans.Start(func(ctx mongo.SessionContext) (any, error) {
 		var dbThread storageThread
-		err := s.threads.FindOne(ctx, bson.D{{"_id", threadObjectID}}).Decode(&dbThread)
+		err := s.threads.FindOne(ctx, bson.M{"_id": threadObjectID}).Decode(&dbThread)
+		if err != nil {
+			return false, fmt.Errorf("find one: %w", err)
+		}
 
 		if !compareHash(dbThread.DeletePassword, param.DeletePassword) {
 			return false, nil
 		}
 
-		if _, err = s.threads.DeleteOne(ctx, bson.D{{"_id", threadObjectID}}); err != nil {
+		if _, err = s.threads.DeleteOne(ctx, bson.M{"_id": threadObjectID}); err != nil {
 			return false, fmt.Errorf("delete one: %w", err)
 		}
 
-		if _, err := s.replies.DeleteMany(ctx, bson.D{{"thread_id", param.ThreadID}}); err != nil {
+		if _, err := s.replies.DeleteMany(ctx, bson.M{"thread_id": param.ThreadID}); err != nil {
 			return false, fmt.Errorf("delete replies: %w", err)
 		}
 
@@ -147,7 +150,7 @@ func (s *Service) ReportThread(ctx context.Context, board, threadID string) erro
 
 	res, err := s.threads.UpdateOne(ctx,
 		bson.D{{"_id", threadObjectID}, {"board", board}},
-		bson.D{{"$set", bson.D{{"is_reported", true}}}})
+		bson.M{"$set": bson.M{"is_reported": true}})
 	if err != nil {
 		return fmt.Errorf("update one: %w", err)
 	}
@@ -172,8 +175,8 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 
 	n := now()
 	update := bson.D{
-		{"$set", bson.D{{"bumped_on", n}}},
-		{"$inc", bson.D{{"reply_count", 1}}},
+		{"$set", bson.M{"bumped_on": n}},
+		{"$inc", bson.M{"reply_count": 1}},
 	}
 
 	trans, err := NewTransaction(ctx, s.dbClient)
@@ -262,7 +265,7 @@ func (s *Service) DeleteReply(ctx context.Context, param DeleteReplyParam) (bool
 			return false, nil
 		}
 
-		if _, err := s.replies.UpdateOne(ctx, filter, bson.D{{"$set", bson.D{{"text", "[deleted]"}}}}); err != nil {
+		if _, err := s.replies.UpdateOne(ctx, filter, bson.M{"$set": bson.M{"text": "[deleted]"}}); err != nil {
 			return false, fmt.Errorf("delete one: %w", err)
 		}
 
@@ -285,7 +288,7 @@ func (s *Service) ReportReply(ctx context.Context, board, threadID, replyID stri
 		{"_id", replyObjectID},
 		{"thread_id", threadID},
 		{"board", board},
-	}, bson.D{{"$set", bson.D{{"is_reported", true}}}})
+	}, bson.D{{"$set", bson.M{"is_reported": true}}})
 	if err != nil {
 		return fmt.Errorf("update one: %w", err)
 	}
