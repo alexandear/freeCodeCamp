@@ -2,7 +2,6 @@ package msgboard
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -78,11 +78,15 @@ func (s *Service) Thread(ctx context.Context, board, threadID string) (ThreadRes
 }
 
 func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (string, error) {
-	createdOn := now()
+	deletePassword, err := hashPassword(param.DeletePassword)
+	if err != nil {
+		return "", fmt.Errorf("make hash: %w", err)
+	}
 
+	createdOn := now()
 	threadID := primitive.NewObjectID()
-	deletePassword := makeHashPassword(param.DeletePassword)
-	_, err := s.threads.InsertOne(ctx, bson.D{
+
+	if _, err := s.threads.InsertOne(ctx, bson.D{
 		{"_id", threadID},
 		{"board", param.Board},
 		{"text", param.Text},
@@ -91,8 +95,7 @@ func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (st
 		{"delete_password", deletePassword},
 		{"is_reported", false},
 		{"reply_count", 0},
-	})
-	if err != nil {
+	}); err != nil {
 		return "", fmt.Errorf("insert one: %w", err)
 	}
 
@@ -105,8 +108,6 @@ func (s *Service) DeleteThread(ctx context.Context, param DeleteThreadParam) (bo
 		return false, fmt.Errorf("wrong object id: %w", err)
 	}
 
-	deletePassword := makeHashPassword(param.DeletePassword)
-
 	trans, err := NewTransaction(ctx, s.dbClient)
 	if err != nil {
 		return false, err
@@ -114,13 +115,15 @@ func (s *Service) DeleteThread(ctx context.Context, param DeleteThreadParam) (bo
 	defer trans.Close()
 
 	res, err := trans.Start(func(ctx mongo.SessionContext) (any, error) {
-		res, err := s.threads.DeleteOne(ctx, bson.D{{"_id", threadObjectID}, {"delete_password", deletePassword}})
-		if err != nil {
-			return false, fmt.Errorf("delete one: %w", err)
+		var dbThread storageThread
+		err := s.threads.FindOne(ctx, bson.D{{"_id", threadObjectID}}).Decode(&dbThread)
+
+		if !compareHash(dbThread.DeletePassword, param.DeletePassword) {
+			return false, nil
 		}
 
-		if res.DeletedCount == 0 {
-			return false, nil
+		if _, err = s.threads.DeleteOne(ctx, bson.D{{"_id", threadObjectID}}); err != nil {
+			return false, fmt.Errorf("delete one: %w", err)
 		}
 
 		if _, err := s.replies.DeleteMany(ctx, bson.D{{"thread_id", param.ThreadID}}); err != nil {
@@ -162,6 +165,11 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 		return "", fmt.Errorf("wrong object id: %w", err)
 	}
 
+	deletePassword, err := hashPassword(param.DeletePassword)
+	if err != nil {
+		return "", fmt.Errorf("make hash: %w", err)
+	}
+
 	n := now()
 	update := bson.D{
 		{"$set", bson.D{{"bumped_on", n}}},
@@ -184,7 +192,6 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 		}
 
 		replyID := primitive.NewObjectID()
-		deletePassword := makeHashPassword(param.DeletePassword)
 		_, err = s.replies.InsertOne(ctx, bson.D{
 			{"_id", replyID},
 			{"thread_id", param.ThreadID},
@@ -232,22 +239,40 @@ func (s *Service) DeleteReply(ctx context.Context, param DeleteReplyParam) (bool
 		return false, fmt.Errorf("wrong object id: %w", err)
 	}
 
-	deletePassword := makeHashPassword(param.DeletePassword)
-	res, err := s.replies.UpdateOne(ctx, bson.D{
-		{"_id", replyObjectID},
-		{"thread_id", param.ThreadID},
-		{"board", param.Board},
-		{"delete_password", deletePassword},
-	}, bson.D{{"$set", bson.D{{"text", "[deleted]"}}}})
+	trans, err := NewTransaction(ctx, s.dbClient)
 	if err != nil {
-		return false, fmt.Errorf("delete one: %w", err)
+		return false, err
+	}
+	defer trans.Close()
+
+	res, err := trans.Start(func(ctx mongo.SessionContext) (any, error) {
+		filter := bson.D{
+			{"_id", replyObjectID},
+			{"thread_id", param.ThreadID},
+			{"board", param.Board},
+		}
+
+		var dbReply storageReply
+		err = s.replies.FindOne(ctx, filter).Decode(&dbReply)
+		if err != nil {
+			return false, fmt.Errorf("find one: %w", err)
+		}
+
+		if !compareHash(dbReply.DeletePassword, param.DeletePassword) {
+			return false, nil
+		}
+
+		if _, err := s.replies.UpdateOne(ctx, filter, bson.D{{"$set", bson.D{{"text", "[deleted]"}}}}); err != nil {
+			return false, fmt.Errorf("delete one: %w", err)
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return false, err
 	}
 
-	if res.ModifiedCount == 0 {
-		return false, nil
-	}
-
-	return true, nil
+	return res.(bool), nil
 }
 
 func (s *Service) ReportReply(ctx context.Context, board, threadID, replyID string) error {
@@ -276,8 +301,14 @@ func now() time.Time {
 	return time.Now().UTC()
 }
 
-func makeHashPassword(password string) []byte {
-	sha := sha256.New()
-	sha.Write([]byte(password))
-	return sha.Sum(nil)
+func hashPassword(password string) ([]byte, error) {
+	pw, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	return pw, nil
+}
+
+func compareHash(hashedPassword []byte, password string) bool {
+	return bcrypt.CompareHashAndPassword(hashedPassword, []byte(password)) == nil
 }
