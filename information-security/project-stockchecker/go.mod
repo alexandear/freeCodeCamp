@@ -30,6 +30,7 @@ require (
 	github.com/xdg-go/scram v1.1.1 // indirect
 	github.com/xdg-go/stringprep v1.0.3 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
+	go.uber.org/goleak v1.2.0
 	golang.org/x/crypto v0.2.0 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/sys v0.3.0 // indirect
