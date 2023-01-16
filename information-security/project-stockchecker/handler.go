@@ -55,13 +55,13 @@ func (h *Handler) StockPrice(ctx echo.Context) error {
 		return fmt.Errorf("stock is required")
 	}
 	ifLike := ctx.QueryParam("like") == "true"
-	remoteAddr := ctx.Request().RemoteAddr
+	userIP := ReadUserIP(ctx.Request())
 
 	if len(stocks) == 1 {
 		param := StockDataParam{
-			Stock:      stocks[0],
-			IfLike:     ifLike,
-			RemoteAddr: remoteAddr,
+			Stock:  stocks[0],
+			IfLike: ifLike,
+			UserIP: userIP,
 		}
 		sd, err := h.stockServ.StockDataAndLike(ctx.Request().Context(), param)
 		if err != nil {
@@ -78,10 +78,10 @@ func (h *Handler) StockPrice(ctx echo.Context) error {
 	}
 
 	param := StockDataParam2{
-		Stock1:     stocks[0],
-		Stock2:     stocks[1],
-		IfLike:     ifLike,
-		RemoteAddr: remoteAddr,
+		Stock1: stocks[0],
+		Stock2: stocks[1],
+		IfLike: ifLike,
+		UserIP: userIP,
 	}
 	sds, err := h.stockServ.StockDataAndLike2(ctx.Request().Context(), param)
 	if err != nil {
@@ -105,4 +105,19 @@ func (h *Handler) StockPrice(ctx echo.Context) error {
 			},
 		},
 	)
+}
+
+// ReadUserIP returns first non-empty value among the
+// X-Real-Ip, X-Forwarded-for and r.RemoteAddr
+// See https://stackoverflow.com/a/55738279.
+func ReadUserIP(r *http.Request) string {
+	ip := r.Header.Get("X-Real-Ip")
+	if ip != "" {
+		return ip
+	}
+	ip = r.Header.Get("X-Forwarded-For")
+	if ip != "" {
+		return ip
+	}
+	return r.RemoteAddr
 }

@@ -19,16 +19,16 @@ type StockData struct {
 }
 
 type StockDataParam struct {
-	Stock      string
-	IfLike     bool
-	RemoteAddr string
+	Stock  string
+	IfLike bool
+	UserIP string
 }
 
 type StockDataParam2 struct {
-	Stock1     string
-	Stock2     string
-	IfLike     bool
-	RemoteAddr string
+	Stock1 string
+	Stock2 string
+	IfLike bool
+	UserIP string
 }
 
 type storageStock struct {
@@ -51,7 +51,7 @@ func NewStockService(db *mongo.Database) *StockService {
 func (s *StockService) StockDataAndLike(ctx context.Context, param StockDataParam) (StockData, error) {
 	stock := param.Stock
 
-	ipHash, err := hashIP(param.RemoteAddr)
+	ipHash, err := hashIP(param.UserIP)
 	if err != nil {
 		return StockData{}, err
 	}
@@ -101,9 +101,9 @@ func (s *StockService) StockDataAndLike2(ctx context.Context, param StockDataPar
 	)
 	g.Go(func() error {
 		p := StockDataParam{
-			Stock:      param.Stock1,
-			IfLike:     param.IfLike,
-			RemoteAddr: param.RemoteAddr,
+			Stock:  param.Stock1,
+			IfLike: param.IfLike,
+			UserIP: param.UserIP,
 		}
 		sd, err := s.StockDataAndLike(gctx, p)
 		if err != nil {
@@ -119,9 +119,9 @@ func (s *StockService) StockDataAndLike2(ctx context.Context, param StockDataPar
 	)
 	g.Go(func() error {
 		p := StockDataParam{
-			Stock:      param.Stock2,
-			IfLike:     param.IfLike,
-			RemoteAddr: param.RemoteAddr,
+			Stock:  param.Stock2,
+			IfLike: param.IfLike,
+			UserIP: param.UserIP,
 		}
 		sd, err := s.StockDataAndLike(gctx, p)
 		if err != nil {
@@ -147,13 +147,16 @@ func (s *StockService) StockDataAndLike2(ctx context.Context, param StockDataPar
 	}, nil
 }
 
-func hashIP(remoteAddr string) (string, error) {
-	ipPort := strings.Split(remoteAddr, ":")
-	if len(ipPort) != 2 {
-		return "", fmt.Errorf("remote addr must have format 'ip:port'")
+func hashIP(ip string) (string, error) {
+	if ip == "" {
+		return "", fmt.Errorf("ip must not be empty")
+	}
+	ipToHash := ip
+	if ipPort := strings.Split(ip, ":"); len(ipPort) > 1 {
+		ipToHash = ipPort[0]
 	}
 
 	sha := sha256.New()
-	sha.Write([]byte(ipPort[0]))
+	sha.Write([]byte(ipToHash))
 	return string(sha.Sum(nil)), nil
 }

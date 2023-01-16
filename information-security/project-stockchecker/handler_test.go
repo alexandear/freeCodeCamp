@@ -116,12 +116,10 @@ func TestHandler_StockPrice_TwoStocksWithLikes(t *testing.T) {
 	s := newTestServer(t)
 	defer s.Close()
 
-	err := requests.URL(s.URL + "/api/stock-prices?stock=TSLA&like=true").Fetch(context.Background())
-	require.NoError(t, err)
-	update := bson.D{{"$inc", bson.D{{"likes_count", 2}}}}
-	_, err = s.StockServer().stocks.UpdateByID(context.Background(), "TSLA", update)
-	require.NoError(t, err)
-	err = requests.URL(s.URL + "/api/stock-prices?stock=KO&like=true").Fetch(context.Background())
+	reqLike := requests.URL(s.URL + "/api/stock-prices?stock=TSLA&like=true")
+	require.NoError(t, reqLike.Header("X-Real-Ip", "172.27.0.31").Fetch(context.Background()))
+	require.NoError(t, reqLike.Header("X-Real-Ip", "172.27.0.32").Fetch(context.Background()))
+	err := requests.URL(s.URL + "/api/stock-prices?stock=KO&like=true").Fetch(context.Background())
 	require.NoError(t, err)
 
 	var actual StockPricesResp
@@ -156,7 +154,6 @@ type testServer struct {
 
 	server      *httptest.Server
 	mongoClient *mongo.Client
-	stockServer *StockService
 }
 
 func newTestServer(t *testing.T) *testServer {
@@ -194,12 +191,7 @@ func newTestServer(t *testing.T) *testServer {
 		t:           t,
 		server:      ts,
 		mongoClient: client,
-		stockServer: stockServer,
 	}
-}
-
-func (ts *testServer) StockServer() *StockService {
-	return ts.stockServer
 }
 
 func (ts *testServer) Close() {
