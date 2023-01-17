@@ -9,25 +9,31 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
-type Transaction struct {
-	ctx     context.Context
-	session mongo.Session
+type transaction struct {
+	ctx    context.Context
+	client *mongo.Client
 }
 
-func NewTransaction(ctx context.Context, dbClient *mongo.Client) (*Transaction, error) {
-	session, err := dbClient.StartSession()
+func NewTransaction(ctx context.Context, client *mongo.Client) *transaction {
+	return &transaction{
+		ctx:    ctx,
+		client: client,
+	}
+}
+
+func (t *transaction) Start(fn func(ctx mongo.SessionContext) (any, error),
+) (any, error) {
+	session, err := t.client.StartSession()
 	if err != nil {
 		return nil, fmt.Errorf("start session: %w", err)
 	}
-	return &Transaction{session: session, ctx: ctx}, nil
-}
+	defer session.EndSession(t.ctx)
 
-func (t *Transaction) Close() {
-	t.session.EndSession(t.ctx)
-}
-
-func (t *Transaction) Start(fn func(ctx mongo.SessionContext) (any, error),
-) (any, error) {
 	txnOptions := options.Transaction().SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
-	return t.session.WithTransaction(t.ctx, fn, txnOptions)
+	res, err := session.WithTransaction(t.ctx, fn, txnOptions)
+	if err != nil {
+		return nil, fmt.Errorf("execute transaction: %w", err)
+	}
+
+	return res, nil
 }

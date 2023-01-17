@@ -108,13 +108,7 @@ func (s *Service) DeleteThread(ctx context.Context, param DeleteThreadParam) (bo
 		return false, fmt.Errorf("wrong object id: %w", err)
 	}
 
-	trans, err := NewTransaction(ctx, s.dbClient)
-	if err != nil {
-		return false, err
-	}
-	defer trans.Close()
-
-	res, err := trans.Start(func(ctx mongo.SessionContext) (any, error) {
+	res, err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
 		var dbThread storageThread
 		err := s.threads.FindOne(ctx, bson.M{"_id": threadObjectID}).Decode(&dbThread)
 		if err != nil {
@@ -179,13 +173,7 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 		{"$inc", bson.M{"reply_count": 1}},
 	}
 
-	trans, err := NewTransaction(ctx, s.dbClient)
-	if err != nil {
-		return "", err
-	}
-	defer trans.Close()
-
-	res, err := trans.Start(func(ctx mongo.SessionContext) (any, error) {
+	res, err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
 		_, err = s.threads.UpdateByID(ctx, threadObjectID, update)
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return "", fmt.Errorf("board not found: %w", err)
@@ -242,13 +230,7 @@ func (s *Service) DeleteReply(ctx context.Context, param DeleteReplyParam) (bool
 		return false, fmt.Errorf("wrong object id: %w", err)
 	}
 
-	trans, err := NewTransaction(ctx, s.dbClient)
-	if err != nil {
-		return false, err
-	}
-	defer trans.Close()
-
-	res, err := trans.Start(func(ctx mongo.SessionContext) (any, error) {
+	res, err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
 		filter := bson.D{
 			{"_id", replyObjectID},
 			{"thread_id", param.ThreadID},
