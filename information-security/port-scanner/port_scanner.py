@@ -32,15 +32,10 @@ def get_open_ports(target: str, port_range: List[int], is_verbose: bool = False)
     open_ports = []
     start, stop = port_range
     for port in range(start, stop+1):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1)
-        try:
-            s.connect((target, port))
-            open_ports.append(port)
-        except socket.error:
-            pass
-        finally:
-            s.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.2)
+            if s.connect_ex((target, port)) == 0:
+                open_ports.append(port)
 
     if not is_verbose:
         return open_ports
