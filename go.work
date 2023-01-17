@@ -8,4 +8,5 @@ use (
 	./backend-development/project-urlshortener
 	./information-security/project-messageboard
 	./information-security/project-stockchecker
+	./information-security/sha-1-password-cracker
 )
