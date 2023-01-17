@@ -21,19 +21,17 @@ func NewTransaction(ctx context.Context, client *mongo.Client) *transaction {
 	}
 }
 
-func (t *transaction) Start(fn func(ctx mongo.SessionContext) (any, error),
-) (any, error) {
+func (t *transaction) Start(fn func(ctx mongo.SessionContext) (any, error)) error {
 	session, err := t.client.StartSession()
 	if err != nil {
-		return nil, fmt.Errorf("start session: %w", err)
+		return fmt.Errorf("start session: %w", err)
 	}
 	defer session.EndSession(t.ctx)
 
 	txnOptions := options.Transaction().SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
-	res, err := session.WithTransaction(t.ctx, fn, txnOptions)
-	if err != nil {
-		return nil, fmt.Errorf("execute transaction: %w", err)
+	if _, err := session.WithTransaction(t.ctx, fn, txnOptions); err != nil {
+		return fmt.Errorf("execute transaction: %w", err)
 	}
 
-	return res, nil
+	return nil
 }

@@ -19,15 +19,20 @@ type storageThread struct {
 	ReplyCount     int       `bson:"reply_count"`
 }
 
-func (t *storageThread) ToThread(replies []ReplyRes) ThreadRes {
+func (t *storageThread) ToThread(storageReplies []storageReply) ThreadRes {
+	replies := make([]ReplyRes, 0, len(storageReplies))
+	for _, storageReply := range storageReplies {
+		replies = append(replies, storageReply.ToReply())
+	}
+
 	return ThreadRes{
 		ThreadID:   t.ThreadID,
 		Text:       t.Text,
 		CreatedOn:  t.CreatedOn,
 		BumpedOn:   t.BumpedOn,
 		IsReported: t.IsReported,
-		Replies:    replies,
 		ReplyCount: t.ReplyCount,
+		Replies:    replies,
 	}
 }
 

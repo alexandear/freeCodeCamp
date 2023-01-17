@@ -33,25 +33,44 @@ func NewService(db *mongo.Database) *Service {
 }
 
 func (s *Service) Threads(ctx context.Context, board string) ([]ThreadRes, error) {
-	opts := options.Find().SetLimit(maxReturnedThreadsCount).SetSort(bson.M{"bumped_on": -1})
-	cursor, err := s.threads.Find(ctx, bson.M{"board": board}, opts)
-	if err != nil {
-		return nil, fmt.Errorf("find: %w", err)
-	}
-
+	findThreadOpts := options.Find().SetLimit(maxReturnedThreadsCount).SetSort(bson.M{"bumped_on": -1})
+	findRepliesOpts := options.Find().SetLimit(maxReturnedRepliesCount)
 	dbThreads := make([]storageThread, 0, maxReturnedThreadsCount)
-	if err := cursor.All(ctx, &dbThreads); err != nil {
-		return nil, fmt.Errorf("cursor all: %w", err)
+	threadsReplies := make(map[string][]storageReply, maxReturnedThreadsCount)
+
+	if err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
+		cursorThread, err := s.threads.Find(ctx, bson.M{"board": board}, findThreadOpts)
+		if err != nil {
+			return nil, fmt.Errorf("find thread: %w", err)
+		}
+
+		if err := cursorThread.All(ctx, &dbThreads); err != nil {
+			return nil, fmt.Errorf("cursor thread all: %w", err)
+		}
+
+		// TODO: use aggregation for more efficient query https://stackoverflow.com/a/34812350
+		for _, dbThread := range dbThreads {
+			cursorReply, err := s.replies.Find(ctx, bson.D{{"thread_id", dbThread.ThreadID}}, findRepliesOpts)
+			if err != nil {
+				return nil, fmt.Errorf("find replies: %w", err)
+			}
+
+			dbReplies := make([]storageReply, 0, maxReturnedRepliesCount)
+			if err := cursorReply.All(ctx, &dbReplies); err != nil {
+				return nil, fmt.Errorf("cursor replies all: %w", err)
+			}
+			threadsReplies[dbThread.ThreadID] = dbReplies
+		}
+
+		return nil, nil
+	}); err != nil {
+		return nil, err
 	}
 
 	threads := make([]ThreadRes, 0, len(dbThreads))
 	for _, dbThread := range dbThreads {
-		replies, err := s.RepliesForThread(ctx, dbThread.ThreadID, maxReturnedRepliesCount)
-		if err != nil {
-			return nil, fmt.Errorf("replies for msgboard=%s: %w", dbThread.ThreadID, err)
-		}
-
-		threads = append(threads, dbThread.ToThread(replies))
+		dbReplies := threadsReplies[dbThread.ThreadID]
+		threads = append(threads, dbThread.ToThread(dbReplies))
 	}
 
 	return threads, nil
@@ -63,18 +82,32 @@ func (s *Service) Thread(ctx context.Context, board, threadID string) (ThreadRes
 		return ThreadRes{}, fmt.Errorf("object id from hex: %w", err)
 	}
 
-	var dbThread storageThread
-	err = s.threads.FindOne(ctx, bson.D{{"board", board}, {"_id", threadObjID}}).Decode(&dbThread)
-	if err != nil {
-		return ThreadRes{}, fmt.Errorf("find one thread: %w", err)
+	var (
+		dbThread  storageThread
+		dbReplies []storageReply
+	)
+
+	if err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
+		err := s.threads.FindOne(ctx, bson.D{{"board", board}, {"_id", threadObjID}}).Decode(&dbThread)
+		if err != nil {
+			return nil, fmt.Errorf("find one thread: %w", err)
+		}
+
+		cursor, err := s.replies.Find(ctx, bson.D{{"thread_id", threadID}})
+		if err != nil {
+			return nil, fmt.Errorf("find replies: %w", err)
+		}
+
+		if err := cursor.All(ctx, &dbReplies); err != nil {
+			return nil, fmt.Errorf("cursor all: %w", err)
+		}
+
+		return nil, nil
+	}); err != nil {
+		return ThreadRes{}, err
 	}
 
-	replies, err := s.RepliesForThread(ctx, threadID, 0)
-	if err != nil {
-		return ThreadRes{}, fmt.Errorf("find replies: %w", err)
-	}
-
-	return dbThread.ToThread(replies), nil
+	return dbThread.ToThread(dbReplies), nil
 }
 
 func (s *Service) CreateThread(ctx context.Context, param CreateThreadParam) (string, error) {
@@ -108,32 +141,35 @@ func (s *Service) DeleteThread(ctx context.Context, param DeleteThreadParam) (bo
 		return false, fmt.Errorf("wrong object id: %w", err)
 	}
 
-	res, err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
-		var dbThread storageThread
+	var (
+		dbThread          storageThread
+		ifCorrectPassword bool
+	)
+	if err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
 		err := s.threads.FindOne(ctx, bson.M{"_id": threadObjectID}).Decode(&dbThread)
 		if err != nil {
-			return false, fmt.Errorf("find one: %w", err)
+			return nil, fmt.Errorf("find one: %w", err)
 		}
 
-		if !compareHash(dbThread.DeletePassword, param.DeletePassword) {
-			return false, nil
+		ifCorrectPassword = compareHash(dbThread.DeletePassword, param.DeletePassword)
+		if !ifCorrectPassword {
+			return nil, nil
 		}
 
 		if _, err = s.threads.DeleteOne(ctx, bson.M{"_id": threadObjectID}); err != nil {
-			return false, fmt.Errorf("delete one: %w", err)
+			return nil, fmt.Errorf("delete one: %w", err)
 		}
 
 		if _, err := s.replies.DeleteMany(ctx, bson.M{"thread_id": param.ThreadID}); err != nil {
-			return false, fmt.Errorf("delete replies: %w", err)
+			return nil, fmt.Errorf("delete replies: %w", err)
 		}
 
-		return true, nil
-	})
-	if err != nil {
+		return nil, nil
+	}); err != nil {
 		return false, err
 	}
 
-	return res.(bool), nil
+	return ifCorrectPassword, nil
 }
 
 func (s *Service) ReportThread(ctx context.Context, board, threadID string) error {
@@ -173,16 +209,17 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 		{"$inc", bson.M{"reply_count": 1}},
 	}
 
-	res, err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
+	replyID := primitive.NewObjectID()
+
+	if err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
 		_, err = s.threads.UpdateByID(ctx, threadObjectID, update)
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return "", fmt.Errorf("board not found: %w", err)
+			return nil, fmt.Errorf("board not found: %w", err)
 		}
 		if err != nil {
-			return "", fmt.Errorf("find one and update err: %w", err)
+			return nil, fmt.Errorf("find one and update err: %w", err)
 		}
 
-		replyID := primitive.NewObjectID()
 		_, err = s.replies.InsertOne(ctx, bson.D{
 			{"_id", replyID},
 			{"thread_id", param.ThreadID},
@@ -193,35 +230,15 @@ func (s *Service) CreateReply(ctx context.Context, param CreateReplyParam) (stri
 			{"is_reported", false},
 		})
 		if err != nil {
-			return "", fmt.Errorf("insert one: %w", err)
+			return nil, fmt.Errorf("insert one: %w", err)
 		}
 
-		return replyID.Hex(), nil
-	})
-	if err != nil {
+		return nil, nil
+	}); err != nil {
 		return "", err
 	}
 
-	return res.(string), nil
-}
-
-func (s *Service) RepliesForThread(ctx context.Context, threadID string, limit int) ([]ReplyRes, error) {
-	cursor, err := s.replies.Find(ctx, bson.D{{"thread_id", threadID}}, options.Find().SetLimit(int64(limit)))
-	if err != nil {
-		return nil, fmt.Errorf("find: %w", err)
-	}
-
-	dbReplies := make([]storageReply, 0, limit)
-	if err := cursor.All(ctx, &dbReplies); err != nil {
-		return nil, fmt.Errorf("cursor all: %w", err)
-	}
-
-	replies := make([]ReplyRes, 0, len(dbReplies))
-	for _, dbReply := range dbReplies {
-		replies = append(replies, dbReply.ToReply())
-	}
-
-	return replies, nil
+	return replyID.Hex(), nil
 }
 
 func (s *Service) DeleteReply(ctx context.Context, param DeleteReplyParam) (bool, error) {
@@ -230,34 +247,37 @@ func (s *Service) DeleteReply(ctx context.Context, param DeleteReplyParam) (bool
 		return false, fmt.Errorf("wrong object id: %w", err)
 	}
 
-	res, err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
-		filter := bson.D{
-			{"_id", replyObjectID},
-			{"thread_id", param.ThreadID},
-			{"board", param.Board},
-		}
+	filter := bson.D{
+		{"_id", replyObjectID},
+		{"thread_id", param.ThreadID},
+		{"board", param.Board},
+	}
 
-		var dbReply storageReply
+	var (
+		dbReply           storageReply
+		ifCorrectPassword bool
+	)
+	if err := NewTransaction(ctx, s.dbClient).Start(func(ctx mongo.SessionContext) (any, error) {
 		err = s.replies.FindOne(ctx, filter).Decode(&dbReply)
 		if err != nil {
 			return false, fmt.Errorf("find one: %w", err)
 		}
 
-		if !compareHash(dbReply.DeletePassword, param.DeletePassword) {
-			return false, nil
+		ifCorrectPassword = compareHash(dbReply.DeletePassword, param.DeletePassword)
+		if !ifCorrectPassword {
+			return nil, nil
 		}
 
 		if _, err := s.replies.UpdateOne(ctx, filter, bson.M{"$set": bson.M{"text": "[deleted]"}}); err != nil {
-			return false, fmt.Errorf("delete one: %w", err)
+			return nil, fmt.Errorf("delete one: %w", err)
 		}
 
-		return true, nil
-	})
-	if err != nil {
+		return nil, nil
+	}); err != nil {
 		return false, err
 	}
 
-	return res.(bool), nil
+	return ifCorrectPassword, nil
 }
 
 func (s *Service) ReportReply(ctx context.Context, board, threadID, replyID string) error {
