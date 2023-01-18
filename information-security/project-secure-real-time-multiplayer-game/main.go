@@ -6,7 +6,11 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/secure"
 	"github.com/gin-gonic/gin"
+
+	"secure-real-time-multiplayer-game/internal/fcc"
 )
 
 func main() {
@@ -27,6 +31,19 @@ func main() {
 	r := gin.Default()
 	r.Static("/public", "./public")
 	r.StaticFile("/", "./views/index.html")
+	r.Use(cors.Default())
+	r.Use(func(c *gin.Context) {
+		c.Header("Surrogate-Control", "no-store")
+		c.Header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
+
+		c.Header("X-Powered-By", "PHP 7.4.3")
+	}, secure.New(secure.Config{
+		BrowserXssFilter:   true,
+		ContentTypeNosniff: true,
+	}))
+	r.Use(fcc.FCC())
 
 	serverAddr := host + ":" + port
 	if err := r.Run(serverAddr); !errors.Is(err, http.ErrServerClosed) {
