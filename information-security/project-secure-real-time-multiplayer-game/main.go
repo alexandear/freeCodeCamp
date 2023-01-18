@@ -31,7 +31,8 @@ func main() {
 	r := gin.Default()
 	r.Static("/public", "./public")
 	r.StaticFile("/", "./views/index.html")
-	r.Use(cors.Default())
+	r.Use(cors.Default(), fcc.FCC()) // for testing
+
 	r.Use(func(c *gin.Context) {
 		c.Header("Surrogate-Control", "no-store")
 		c.Header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
@@ -43,7 +44,6 @@ func main() {
 		BrowserXssFilter:   true,
 		ContentTypeNosniff: true,
 	}))
-	r.Use(fcc.FCC())
 
 	serverAddr := host + ":" + port
 	if err := r.Run(serverAddr); !errors.Is(err, http.ErrServerClosed) {
