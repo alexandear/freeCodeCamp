@@ -8,6 +8,7 @@ use (
 	./backend-development/project-urlshortener
 	./information-security/port-scanner
 	./information-security/project-messageboard
+	./information-security/project-secure-real-time-multiplayer-game
 	./information-security/project-stockchecker
 	./information-security/sha-1-password-cracker
 )
