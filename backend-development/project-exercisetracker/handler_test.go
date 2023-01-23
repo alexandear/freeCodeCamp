@@ -33,6 +33,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestHandlerServeStaticContent(t *testing.T) {
+	t.Parallel()
 	h := newHandler(echo.New(), nil)
 
 	s := httptest.NewServer(h)
@@ -45,6 +46,9 @@ func TestHandlerServeStaticContent(t *testing.T) {
 	defer resIndex.Body.Close()
 
 	indexContent, err := io.ReadAll(resIndex.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(string(indexContent), "<h1>Exercise tracker</h1>") {
 		t.Fatal("index.html must be served")
 	}
@@ -55,12 +59,16 @@ func TestHandlerServeStaticContent(t *testing.T) {
 	}
 
 	styleContent, err := io.ReadAll(resStyle.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(string(styleContent), "background-color:") {
 		t.Fatal("style.css must be served")
 	}
 }
 
 func TestHandler_CreateUser(t *testing.T) {
+	t.Parallel()
 	us := newUserService(db)
 	h := newHandler(echo.New(), us)
 
@@ -101,6 +109,7 @@ func TestHandler_CreateUser(t *testing.T) {
 }
 
 func TestHandler_Users(t *testing.T) {
+	t.Parallel()
 	us := newUserService(db)
 	h := newHandler(echo.New(), us)
 
@@ -142,6 +151,7 @@ func TestHandler_Users(t *testing.T) {
 }
 
 func TestHandler_CreateExercise(t *testing.T) {
+	t.Parallel()
 	us := newUserService(db)
 	h := newHandler(echo.New(), us)
 
@@ -187,6 +197,7 @@ func TestHandler_CreateExercise(t *testing.T) {
 }
 
 func TestHandler_Logs(t *testing.T) {
+	t.Parallel()
 	us := newUserService(db)
 	h := newHandler(echo.New(), us)
 

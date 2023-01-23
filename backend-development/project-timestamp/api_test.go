@@ -15,6 +15,7 @@ func (c *mockClock) Now() time.Time {
 }
 
 func TestApiHandler_OK(t *testing.T) {
+	t.Parallel()
 	api := &apiHandler{
 		clock: &mockClock{},
 	}
@@ -85,6 +86,7 @@ func TestApiHandler_OK(t *testing.T) {
 }
 
 func TestApiHandler_Error(t *testing.T) {
+	t.Parallel()
 	api := &apiHandler{}
 
 	s := httptest.NewServer(api)

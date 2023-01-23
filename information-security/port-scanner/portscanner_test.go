@@ -12,6 +12,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestOpenPorts(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		target    string
 		portStart int

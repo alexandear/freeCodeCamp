@@ -22,6 +22,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestHandler_StockPrice_GetOneStock(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t)
 	defer s.Close()
 
@@ -41,6 +42,7 @@ func TestHandler_StockPrice_GetOneStock(t *testing.T) {
 }
 
 func TestHandler_StockPrice_GetOneStockAndLike(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t)
 	defer s.Close()
 
@@ -60,6 +62,7 @@ func TestHandler_StockPrice_GetOneStockAndLike(t *testing.T) {
 }
 
 func TestHandler_StockPrice_GetOneStockAndLikeFewTimes(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t)
 	defer s.Close()
 
@@ -84,6 +87,7 @@ func TestHandler_StockPrice_GetOneStockAndLikeFewTimes(t *testing.T) {
 }
 
 func TestHandler_StockPrice_GetTwoStocks(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t)
 	defer s.Close()
 
@@ -113,6 +117,7 @@ func TestHandler_StockPrice_GetTwoStocks(t *testing.T) {
 }
 
 func TestHandler_StockPrice_TwoStocksWithLikes(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t)
 	defer s.Close()
 
@@ -157,6 +162,7 @@ type testServer struct {
 }
 
 func newTestServer(t *testing.T) *testServer {
+	t.Helper()
 	var client *mongo.Client
 	func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -195,6 +201,7 @@ func newTestServer(t *testing.T) *testServer {
 }
 
 func (ts *testServer) Close() {
+	ts.t.Helper()
 	ts.server.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

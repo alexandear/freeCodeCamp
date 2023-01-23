@@ -9,6 +9,7 @@ import (
 )
 
 func TestApiHandlerPost(t *testing.T) {
+	t.Parallel()
 	api := &apiHandler{}
 
 	s := httptest.NewServer(api)
@@ -38,6 +39,7 @@ func TestApiHandlerPost(t *testing.T) {
 }
 
 func TestApiHandlerPostError(t *testing.T) {
+	t.Parallel()
 	api := &apiHandler{}
 
 	s := httptest.NewServer(api)
@@ -66,6 +68,7 @@ func TestApiHandlerPostError(t *testing.T) {
 }
 
 func TestApiHandlerGet(t *testing.T) {
+	t.Parallel()
 	api := &apiHandler{}
 
 	s := httptest.NewServer(api)

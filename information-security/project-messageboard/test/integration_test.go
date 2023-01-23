@@ -32,6 +32,7 @@ func init() {
 }
 
 func TestCreateNewThread(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
@@ -74,6 +75,7 @@ func TestCreateNewThread(t *testing.T) {
 }
 
 func TestViewTheMost10RecentThreadsWith3RepliesEach(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
@@ -113,6 +115,7 @@ func TestViewTheMost10RecentThreadsWith3RepliesEach(t *testing.T) {
 }
 
 func TestDeleteThreadWithIncorrectPassword(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
@@ -139,6 +142,7 @@ func TestDeleteThreadWithIncorrectPassword(t *testing.T) {
 }
 
 func TestDeleteThreadWithCorrectPassword(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
@@ -166,6 +170,7 @@ func TestDeleteThreadWithCorrectPassword(t *testing.T) {
 }
 
 func TestReportThread(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
@@ -193,6 +198,7 @@ func TestReportThread(t *testing.T) {
 }
 
 func TestCreateNewReply(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
@@ -245,6 +251,7 @@ func TestCreateNewReply(t *testing.T) {
 }
 
 func TestViewThreadWithAllReplies(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
@@ -283,6 +290,7 @@ func TestViewThreadWithAllReplies(t *testing.T) {
 }
 
 func TestDeleteReplyWithIncorrectPassword(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
@@ -324,6 +332,7 @@ func TestDeleteReplyWithIncorrectPassword(t *testing.T) {
 }
 
 func TestDeleteReplyWithCorrectPassword(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
@@ -374,6 +383,7 @@ func TestDeleteReplyWithCorrectPassword(t *testing.T) {
 }
 
 func TestReportReply(t *testing.T) {
+	t.Parallel()
 	s := newTestServer()
 	defer s.Close()
 
