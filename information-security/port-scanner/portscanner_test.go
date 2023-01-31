@@ -12,7 +12,12 @@ func TestMain(m *testing.M) {
 }
 
 func TestOpenPorts(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
+
 	t.Parallel()
+
 	for name, tc := range map[string]struct {
 		target    string
 		portStart int

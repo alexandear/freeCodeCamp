@@ -20,18 +20,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var client = &http.Client{
-	Timeout: time.Second,
-}
-
-var db *mongo.Database
-
-func TestMain(m *testing.M) {
-	db = newTestMongoDatabase()
-	exit := m.Run()
-	os.Exit(exit)
-}
-
 func TestHandlerServeStaticContent(t *testing.T) {
 	t.Parallel()
 	h := newHandler(echo.New(), nil)
@@ -39,7 +27,7 @@ func TestHandlerServeStaticContent(t *testing.T) {
 	s := httptest.NewServer(h)
 	defer s.Close()
 
-	resIndex, err := client.Get(s.URL + "/")
+	resIndex, err := http.Get(s.URL + "/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +41,7 @@ func TestHandlerServeStaticContent(t *testing.T) {
 		t.Fatal("index.html must be served")
 	}
 
-	resStyle, err := client.Get(s.URL + "/style.css")
+	resStyle, err := http.Get(s.URL + "/style.css")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,13 +57,11 @@ func TestHandlerServeStaticContent(t *testing.T) {
 
 func TestHandler_CreateUser(t *testing.T) {
 	t.Parallel()
-	us := newUserService(db)
-	h := newHandler(echo.New(), us)
 
-	s := httptest.NewServer(h)
+	s := newTestServer(t)
 	defer s.Close()
 
-	res, err := client.PostForm(s.URL+"/api/users", url.Values{
+	res, err := http.PostForm(s.URL+"/api/users", url.Values{
 		"username": {"johndoe"},
 	})
 	if err != nil {
@@ -110,21 +96,19 @@ func TestHandler_CreateUser(t *testing.T) {
 
 func TestHandler_Users(t *testing.T) {
 	t.Parallel()
-	us := newUserService(db)
-	h := newHandler(echo.New(), us)
 
-	s := httptest.NewServer(h)
+	s := newTestServer(t)
 	defer s.Close()
 
 	for _, username := range []string{"cat", "wolf"} {
-		if _, err := client.PostForm(s.URL+"/api/users", url.Values{
+		if _, err := http.PostForm(s.URL+"/api/users", url.Values{
 			"username": {username},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	res, err := client.Get(s.URL + "/api/users")
+	res, err := http.Get(s.URL + "/api/users")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,13 +136,11 @@ func TestHandler_Users(t *testing.T) {
 
 func TestHandler_CreateExercise(t *testing.T) {
 	t.Parallel()
-	us := newUserService(db)
-	h := newHandler(echo.New(), us)
 
-	s := httptest.NewServer(h)
+	s := newTestServer(t)
 	defer s.Close()
 
-	resUser, err := client.PostForm(s.URL+"/api/users", url.Values{
+	resUser, err := http.PostForm(s.URL+"/api/users", url.Values{
 		"username": {"johndoe"},
 	})
 	if err != nil {
@@ -169,7 +151,7 @@ func TestHandler_CreateExercise(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := client.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
+	res, err := http.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
 		"description": {"test"},
 		"duration":    {"60"},
 		"date":        {"1990-01-10"},
@@ -198,13 +180,11 @@ func TestHandler_CreateExercise(t *testing.T) {
 
 func TestHandler_Logs(t *testing.T) {
 	t.Parallel()
-	us := newUserService(db)
-	h := newHandler(echo.New(), us)
 
-	s := httptest.NewServer(h)
+	s := newTestServer(t)
 	defer s.Close()
 
-	resUser, err := client.PostForm(s.URL+"/api/users", url.Values{
+	resUser, err := http.PostForm(s.URL+"/api/users", url.Values{
 		"username": {"johndoe"},
 	})
 	if err != nil {
@@ -232,7 +212,7 @@ func TestHandler_Logs(t *testing.T) {
 			Date:        "2023-11-25",
 		},
 	} {
-		if _, err := client.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
+		if _, err := http.PostForm(s.URL+"/api/users/"+u.ID+"/exercises", url.Values{
 			"description": {ex.Description},
 			"duration":    {strconv.Itoa(ex.Duration)},
 			"date":        {ex.Date},
@@ -242,7 +222,7 @@ func TestHandler_Logs(t *testing.T) {
 	}
 
 	t.Run("all", func(t *testing.T) {
-		res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs")
+		res, err := http.Get(s.URL + "/api/users/" + u.ID + "/logs")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -266,7 +246,7 @@ func TestHandler_Logs(t *testing.T) {
 	})
 
 	t.Run("limit", func(t *testing.T) {
-		res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs?limit=1")
+		res, err := http.Get(s.URL + "/api/users/" + u.ID + "/logs?limit=1")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -290,7 +270,7 @@ func TestHandler_Logs(t *testing.T) {
 	})
 
 	t.Run("from", func(t *testing.T) {
-		res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs?from=2023-01-01")
+		res, err := http.Get(s.URL + "/api/users/" + u.ID + "/logs?from=2023-01-01")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -314,7 +294,7 @@ func TestHandler_Logs(t *testing.T) {
 	})
 
 	t.Run("to", func(t *testing.T) {
-		res, err := client.Get(s.URL + "/api/users/" + u.ID + "/logs?to=2023-04-01")
+		res, err := http.Get(s.URL + "/api/users/" + u.ID + "/logs?to=2023-04-01")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -338,19 +318,58 @@ func TestHandler_Logs(t *testing.T) {
 	})
 }
 
-func newTestMongoDatabase() *mongo.Database {
+type testServer struct {
+	URL string
+
+	t *testing.T
+
+	server      *httptest.Server
+	mongoClient *mongo.Client
+}
+
+func newTestServer(t *testing.T) *testServer {
+	t.Helper()
+
 	mongoURI := os.Getenv("MONGODB_URI")
-
-	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
-	clientOptions := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPIOptions)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	mongoClient, err := mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		panic(err)
+	if mongoURI == "" {
+		t.Skip("MONGODB_URI not set, skipping test")
 	}
 
-	return mongoClient.Database("test_exercise_tracker")
+	var client *mongo.Client
+	func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
+		clientOptions := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPIOptions)
+		cl, err := mongo.Connect(ctx, clientOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		client = cl
+	}()
+
+	db := client.Database("test_exercise_tracker")
+
+	us := newUserService(db)
+	h := newHandler(echo.New(), us)
+	ts := httptest.NewServer(h)
+
+	return &testServer{
+		URL:         ts.URL,
+		t:           t,
+		server:      ts,
+		mongoClient: client,
+	}
+}
+
+func (ts *testServer) Close() {
+	ts.t.Helper()
+	ts.server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := ts.mongoClient.Disconnect(ctx); err != nil {
+		ts.t.Fatal(err)
+	}
 }

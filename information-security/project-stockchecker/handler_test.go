@@ -163,12 +163,16 @@ type testServer struct {
 
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
+
+	mongoURI := os.Getenv("MONGODB_URI")
+	if mongoURI == "" {
+		t.Skip("MONGODB_URI not set, skipping test")
+	}
+
 	var client *mongo.Client
 	func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-
-		mongoURI := os.Getenv("MONGODB_URI")
 
 		serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
 		clientOptions := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPIOptions)

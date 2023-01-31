@@ -32,8 +32,7 @@ func init() {
 }
 
 func TestCreateNewThread(t *testing.T) {
-	t.Parallel()
-	s := newTestServer()
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -75,8 +74,7 @@ func TestCreateNewThread(t *testing.T) {
 }
 
 func TestViewTheMost10RecentThreadsWith3RepliesEach(t *testing.T) {
-	t.Parallel()
-	s := newTestServer()
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -116,7 +114,8 @@ func TestViewTheMost10RecentThreadsWith3RepliesEach(t *testing.T) {
 
 func TestDeleteThreadWithIncorrectPassword(t *testing.T) {
 	t.Parallel()
-	s := newTestServer()
+
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -143,7 +142,8 @@ func TestDeleteThreadWithIncorrectPassword(t *testing.T) {
 
 func TestDeleteThreadWithCorrectPassword(t *testing.T) {
 	t.Parallel()
-	s := newTestServer()
+
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -171,7 +171,8 @@ func TestDeleteThreadWithCorrectPassword(t *testing.T) {
 
 func TestReportThread(t *testing.T) {
 	t.Parallel()
-	s := newTestServer()
+
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -199,7 +200,8 @@ func TestReportThread(t *testing.T) {
 
 func TestCreateNewReply(t *testing.T) {
 	t.Parallel()
-	s := newTestServer()
+
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -252,7 +254,8 @@ func TestCreateNewReply(t *testing.T) {
 
 func TestViewThreadWithAllReplies(t *testing.T) {
 	t.Parallel()
-	s := newTestServer()
+
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -291,7 +294,8 @@ func TestViewThreadWithAllReplies(t *testing.T) {
 
 func TestDeleteReplyWithIncorrectPassword(t *testing.T) {
 	t.Parallel()
-	s := newTestServer()
+
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -333,7 +337,8 @@ func TestDeleteReplyWithIncorrectPassword(t *testing.T) {
 
 func TestDeleteReplyWithCorrectPassword(t *testing.T) {
 	t.Parallel()
-	s := newTestServer()
+
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -384,7 +389,8 @@ func TestDeleteReplyWithCorrectPassword(t *testing.T) {
 
 func TestReportReply(t *testing.T) {
 	t.Parallel()
-	s := newTestServer()
+
+	s := newTestServer(t)
 	defer s.Close()
 
 	client := newTestClient(t, s.URL)
@@ -424,36 +430,70 @@ func TestReportReply(t *testing.T) {
 	assert.Equal(t, "reported", string(reportResp.Body))
 }
 
-func newTestMongoDatabase() *mongo.Database {
-	mongoURI := os.Getenv("MONGODB_URI")
+type testServer struct {
+	URL string
 
-	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
-	clientOptions := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPIOptions)
+	t *testing.T
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	mongoClient, err := mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		panic(err)
-	}
-
-	res := mongoClient.Database("test_message_board")
-
-	_, _ = res.Collection(msgboard.ThreadsCollection).DeleteMany(context.Background(), bson.D{{}})
-	_, _ = res.Collection(msgboard.RepliesCollection).DeleteMany(context.Background(), bson.D{{}})
-
-	return res
+	server      *httptest.Server
+	mongoClient *mongo.Client
 }
 
-func newTestServer() *httptest.Server {
-	db := newTestMongoDatabase()
+func newTestServer(t *testing.T) *testServer {
+	t.Helper()
+
+	mongoURI := os.Getenv("MONGODB_URI")
+	if mongoURI == "" {
+		t.Skip("MONGODB_URI not set, skipping test")
+	}
+
+	var client *mongo.Client
+	func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
+		clientOptions := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPIOptions)
+		cl, err := mongo.Connect(ctx, clientOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		client = cl
+	}()
+
+	db := client.Database("test_message_board")
+
+	func() {
+		ctxDel, cancelDel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelDel()
+
+		_, _ = db.Collection(msgboard.ThreadsCollection).DeleteMany(ctxDel, bson.D{{}})
+		_, _ = db.Collection(msgboard.RepliesCollection).DeleteMany(ctxDel, bson.D{{}})
+	}()
+
 	msgServ := msgboard.NewService(db)
 	serv := httpserv.NewServer(msgServ)
 	r := chi.NewRouter()
 	strictHandler := api.NewStrictHandler(serv, nil)
 	api.HandlerFromMux(strictHandler, r)
-	return httptest.NewServer(r)
+
+	ts := httptest.NewServer(r)
+
+	return &testServer{
+		URL:         ts.URL,
+		t:           t,
+		server:      ts,
+		mongoClient: client,
+	}
+}
+
+func (ts *testServer) Close() {
+	ts.t.Helper()
+	ts.server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	require.NoError(ts.t, ts.mongoClient.Disconnect(ctx))
+	cancel()
 }
 
 func newTestClient(t *testing.T, serverURL string) *clapi.ClientWithResponses {
