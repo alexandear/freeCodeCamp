@@ -7,7 +7,6 @@ import (
 )
 
 func TestCrackSHA1Password(t *testing.T) {
-	t.Parallel()
 	for name, tc := range map[string]struct {
 		passwordHash string
 		ifUseSalts   bool
@@ -59,7 +58,10 @@ func TestCrackSHA1Password(t *testing.T) {
 			expected:     "PASSWORD NOT IN DATABASE",
 		},
 	} {
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			actual := CrackSHA1Hash(tc.passwordHash, tc.ifUseSalts)
 			assert.Equal(t, tc.expected, actual)
 		})

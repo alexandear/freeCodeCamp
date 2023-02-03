@@ -15,14 +15,6 @@ func (c *mockClock) Now() time.Time {
 }
 
 func TestApiHandler_OK(t *testing.T) {
-	t.Parallel()
-	api := &apiHandler{
-		clock: &mockClock{},
-	}
-
-	s := httptest.NewServer(api)
-	defer s.Close()
-
 	for name, tc := range map[string]struct {
 		url  string
 		resp respSuccess
@@ -63,7 +55,17 @@ func TestApiHandler_OK(t *testing.T) {
 			},
 		},
 	} {
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			api := &apiHandler{
+				clock: &mockClock{},
+			}
+
+			s := httptest.NewServer(api)
+			defer s.Close()
+
 			res, err := http.Get(s.URL + tc.url)
 			if err != nil {
 				t.Fatal(err)

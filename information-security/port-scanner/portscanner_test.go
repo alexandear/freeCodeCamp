@@ -16,8 +16,6 @@ func TestOpenPorts(t *testing.T) {
 		t.Skip("Skipping test in short mode")
 	}
 
-	t.Parallel()
-
 	for name, tc := range map[string]struct {
 		target    string
 		portStart int
@@ -69,7 +67,10 @@ func TestOpenPorts(t *testing.T) {
 			wantVerbose: "Open ports for scanme.nmap.org (45.33.32.156)\nPORT     SERVICE\n22       ssh\n80       http",
 		},
 	} {
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := OpenPorts(tc.target, tc.portStart, tc.portEnd)
 
 			assert.NoError(t, err)
